@@ -3,6 +3,7 @@ extends CanvasLayer
 # ── 画面の文字表示(2D と 3D で共通) ─────────────────────────────
 # 左上: いつも見たいこと(日付・所持金・発見・クエスト・小屋・池・選択・足元)。
 # Tab で持ち物(市場を開いているあいだは自動で出す)、F1 で操作説明を足す。
+# タッチの狭い画面では 3 行まで(日付と所持金・植えるもの・足元)。残りは「持ち物」を押すたびにページで見る(レビュー M3)
 # 下の中央: 数秒だけのメッセージ。右: 市場の画面(ストーブでも同じ画面を使う)。
 # 右上: ヒント(logic/Guide.gd)。市場の画面や日記を開いているあいだは隠す。
 # 全体を覆う日記: ベッドで休むと、暗くなって出る。
@@ -20,6 +21,8 @@ const TOUCH_HINT_WIDTH := 280.0   # タッチのときのヒントの文字の�
 const TOUCH_ROW_HEIGHT := 38.0    # タッチのときの市場の行の高さ
 const SHOP_HEADER_HEIGHT := 70.0  # 市場の画面の見出しと余白
 const SHOP_ROW_GAP := 4.0         # 行のあいだ(VBoxContainer の既定)
+const TOUCH_PAGES := 3            # タッチの「持ち物」のページ数(暮らし・持ち物・持ち物のつづき)
+const INVENTORY_SPLIT := 5        # 持ち物の行のうち、はじめのページに出す数(見出し・種・苗木・野菜の種・苗)
 
 signal shop_action(id)  # 市場の画面のボタン(品の id / "sell_<収穫物>" / "close")
 signal region_chosen(id)  # 土地のある都道府県を決めた(view/RegionPicker.gd)
@@ -40,6 +43,7 @@ var _message_timer := 0.0
 var _message_panel: PanelContainer
 var _message_label: Label
 var inventory_open := false  # Tab
+var touch_page := 1          # タッチで持ち物を開いているときのページ(1〜TOUCH_PAGES)
 var help_open := false       # F1
 var text_hidden := false     # F2: 左上の文字とヒントを隠して眺める(レビュー G10。知らせは出る)
 var _action_panel: PanelContainer  # 体の上に出す、今ここでできること 1 つ(レビュー G6。Main.near_action)
@@ -353,8 +357,34 @@ func _process(delta: float) -> void:
 	_bg.visible = not hide_status
 	_update_action()
 
+# Tab(タッチは「持ち物」): PC は開け閉め。タッチは押すたびに次のページ、最後のページの次で閉じる。
+# タッチは画面が狭いので、操作説明とは同時に開かない
+func toggle_inventory() -> void:
+	text_hidden = false  # 持ち物を見たいときは、隠した文字も出す
+	if not touch_mode:
+		inventory_open = not inventory_open
+		return
+	help_open = false
+	if not inventory_open:
+		inventory_open = true
+		touch_page = 1
+	elif touch_page < TOUCH_PAGES:
+		touch_page += 1
+	else:
+		inventory_open = false
+
+# F1(タッチは「操作」)
+func toggle_help() -> void:
+	text_hidden = false
+	help_open = not help_open
+	if touch_mode and help_open:
+		inventory_open = false
+
 # 左上に出す文字
 func status_text() -> String:
+	if touch_mode:
+		return _shown("
+".join(_touch_lines()))
 	var lines := _status_lines()
 	# 市場を開いているあいだは持ち物を自動で出す。ストーブの画面は行の中に持っている数が出るので、重ならないよう出さない
 	var in_kitchen: bool = is_shop_open() and (_main._panel == "kitchen" or _main._panel == "table")
@@ -432,6 +462,64 @@ func _status_lines() -> PackedStringArray:
 		lines.append("持ち物と操作はメニューから")
 	else:
 		lines.append("Tab:%s  F1:%s  F2:文字を隠す" % ["持ち物を閉じる" if inventory_open else "持ち物", "操作を閉じる" if help_open else "操作"])
+	return lines
+
+# タッチの左上: 3 行まで。持ち物か操作を開いていれば、その下に足す
+func _touch_lines() -> PackedStringArray:
+	var dt: Dictionary = _main.world.time.now_local()
+	var clock = _main.world.clock
+	var first := "%d/%d %s %s  %s₽  丸太 %d本" % [
+		dt.month, dt.day, clock.time_text(), _main.SEASON_NAMES[_trees.season],
+		_money_text(_main.world.market.money), int(_main.world.cabin.materials.log),
+	]
+	if _trees.time_offset_years > 0.0:
+		first += "  (+%d年後)" % int(_trees.time_offset_years)
+	if clock.is_preview():
+		first += "  (+%d時間)" % int(clock.preview_hours)
+	var lines := PackedStringArray([first, _main.selection_short_line()])
+	var here := _here_line()
+	if here != "":
+		lines.append(here)
+	if inventory_open and not is_shop_open():
+		lines.append_array(_touch_page_lines(clampi(touch_page, 1, TOUCH_PAGES)))
+	elif help_open:
+		lines.append_array(_touch_help_lines())
+	return lines
+
+# タッチの左上の 3 行目: 足元・そばでできること 1 つ。体の上の札(Main.near_action)と同じ順で選ぶ
+func _here_line() -> String:
+	var market := ""
+	if _main.world.market.is_near(_main.player_pos()) and not is_shop_open():
+		market = "市場の前(B で開く)"
+	for line in [_main.people_line(), _main.furniture_line(), market, _main.plot_line(), _main.mill_line(),
+			_main.pond_beside_line(), _main.feeder_line(), _main.nest_box_line(), _main.prune_line()]:
+		if line != "":
+			return line
+	# 巣箱のそばだけ(離れているときの「○箱・蜂○箱」は暮らしのページへ)
+	if not _main.world.bees.hive_near(_main.player_pos()).is_empty():
+		return _main.hive_line()
+	return ""
+
+# タッチの持ち物のページ。1: 暮らし(PC の左上に出ている残り)、2: 持ち物(種・苗木・野菜の種・苗)、3: 持ち物のつづき
+func _touch_page_lines(page: int) -> PackedStringArray:
+	var lines := PackedStringArray()
+	var next := "「持ち物」で次へ" if page < TOUCH_PAGES else "「持ち物」で閉じる"
+	if page == 1:
+		lines.append("─ 暮らし ─  %d/%d %s" % [page, TOUCH_PAGES, next])
+		if _trees.last_day == _trees.today() and _trees.today_event != "":
+			lines.append("今日の発見: " + _main.daily_message(_trees.today_event))
+		for line in [_main.quest_line(), _main.cabin_line(), _main.kitchen_line(), _main.meal_line(), _main.pond_line(),
+				_main.well_line(), _main.tools_line(), _main.hive_line(), _main.selection_line()]:
+			if line != "":
+				lines.append(line)
+		return lines
+	var inv := _inventory_lines()
+	if page == 2:
+		lines.append("%s  %d/%d %s" % [inv[0], page, TOUCH_PAGES, next])
+		lines.append_array(inv.slice(1, INVENTORY_SPLIT))
+	else:
+		lines.append("─ 持ち物のつづき ─  %d/%d %s" % [page, TOUCH_PAGES, next])
+		lines.append_array(inv.slice(INVENTORY_SPLIT))
 	return lines
 
 # 持ち物(Tab)

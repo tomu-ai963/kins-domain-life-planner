@@ -118,8 +118,12 @@ func _test_wording() -> void:
 	# ゲームのすべての文字列で、キーボードの言い方が残らない
 	var leftover := PackedStringArray()
 	var strings := RegEx.create_from_string("\"((?:[^\"\\\\]|\\\\.)*)\"")
-	var keyboard := RegEx.create_from_string("WASD|矢印|ホイール|クリック|Enter|Esc|Tab|F1|SPACE|\\[[0-9A-Z]\\]|(?<![A-Za-z0-9])[A-Z] (で|を)")
-	for path in ["res://Main.gd", "res://HUD.gd"]:
+	var keyboard := RegEx.create_from_string("WASD|矢印|ホイール|クリック|Enter|Esc|Tab|F1|SPACE|\\[[0-9A-Z]\\]|(?<![A-Za-z0-9])[A-Z] (で|を)|(?<![A-Za-z0-9])[QEZHCBFPJLXUVKIO](?=[)・])")
+	var paths := ["res://Main.gd", "res://HUD.gd"]
+	for file in DirAccess.get_files_at("res://view/main"):  # Main から分けた画面の部品(レビュー C4)
+		if file.ends_with(".gd"):
+			paths.append("res://view/main/" + file)
+	for path in paths:
 		for line in FileAccess.get_file_as_string(path).split("\n"):
 			if line.strip_edges().begins_with("#") or line.contains("func _help_lines") or line.contains("Tab:%s") or line.contains("group_keys_text(\"broadleaf\")") or line.contains("var keys := [\"[4]\""):
 				continue
@@ -138,8 +142,11 @@ func _is_pc_help(text: String) -> bool:
 
 # 実際に画面の文字が置き換わる
 func _test_wording_on_screen() -> void:
-	_check(hud.status_text().contains("持ち物と操作はメニューから") and not hud.status_text().contains("Tab:"), "左上の文字がタッチの言い方になる")
-	_check(hud.status_text().contains("「小屋」で足元に"), "左上の案内がボタンの名前になる")
+	_check(not hud.status_text().contains("Tab:") and not hud.status_text().contains("F2:"), "左上の文字がタッチの言い方になる")
+	_check(hud.status_text().split("\n").size() <= 3, "タッチの左上は 3 行まで(%d 行。レビュー M3)" % hud.status_text().split("\n").size())
+	hud.toggle_inventory()
+	_check(hud.status_text().contains("─ 暮らし ─") and hud.status_text().contains("「小屋」で足元に"), "暮らしのページの案内がボタンの名前になる")
+	hud.inventory_open = false
 	hud.help_open = true
 	_check(hud.status_text().contains("左のスティック") and not hud.status_text().contains("WASD"), "操作説明がタッチのものになる")
 	hud.help_open = false
@@ -280,9 +287,13 @@ func _test_menu() -> void:
 	var open_before: bool = hud.inventory_open
 	await _tap("items")
 	_check(hud.inventory_open != open_before and not tc.menu_open, "持ち物を開くと、読めるようにメニューは閉じる")
+	for i in hud.TOUCH_PAGES - 1:
+		await _tap("menu")
+		await _tap("items")
+	_check(hud.inventory_open and hud.touch_page == hud.TOUCH_PAGES, "押すたびに次のページ(%d/%d)" % [hud.touch_page, hud.TOUCH_PAGES])
 	await _tap("menu")
 	await _tap("items")
-	_check(hud.inventory_open == open_before, "もう一度押すと閉じる")
+	_check(hud.inventory_open == open_before, "最後のページのあとで閉じる")
 	await _tap("menu")
 	await _tap("menu_close")
 	_check(not tc.menu_open and not _pad("plant").is_empty(), "閉じるボタンで元に戻る")

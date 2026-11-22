@@ -16,6 +16,7 @@ const PHRASES := [
 	["[4]〜[9] で", "メニューで"],
 	["[V] で", "メニューで"],
 	["Tab の持ち物", "メニューの持ち物"],
+	["を選んで H)", "を選んで「小屋」)"],  # 窓辺の苗づくり(家具の名前が同じ行にあっても「使う」ではない)
 	[" [9]", ""],
 	[" [6]", ""],
 ]
@@ -35,7 +36,8 @@ static var _key_regex: RegEx
 
 static func convert(text: String) -> String:
 	if _key_regex == null:
-		_key_regex = RegEx.create_from_string("(?<![A-Za-z0-9])(SPACE|[QEZHCBFPJLXUVKIO]) (?=[でを])")
+		# 「H で」「Z を」のほかに、かっこの中の「(J)」「(E・あと 3 日)」「の前で H)」も置き換える
+		_key_regex = RegEx.create_from_string("(?<![A-Za-z0-9])(SPACE|[QEZHCBFPJLXUVKIO])(?: (?=[でを])|(?=[)・]))")
 	for p in PHRASES:
 		text = text.replace(p[0], p[1])
 	var lines := text.split("\n")

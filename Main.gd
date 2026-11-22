@@ -1125,6 +1125,12 @@ func selection_line() -> String:
 		crop.name, world.garden.seeds[selected_crop], seedlings, crop_seasons(selected_crop), crop.grow_days,
 	]
 
+# タッチの左上に出す短い選択(レビュー M3)。例: 「植える: 白樺の種 270・ラディッシュの種 0」
+func selection_short_line() -> String:
+	var stock: Dictionary = world.forest.saplings if selected_form == "sapling" else world.forest.seeds
+	var crop: Dictionary = world.garden.CROPS[selected_crop]
+	return "植える: %s %d・%sの種 %d" % [selected_name(), stock[selected_species], crop.name, world.garden.seeds[selected_crop]]
+
 # HUD に出す、足元の区画の様子。区画の上でなければ ""
 func plot_line() -> String:
 	var g := world.garden
@@ -1752,11 +1758,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	match event.keycode:
 		KEY_TAB:
-			$HUD.inventory_open = not $HUD.inventory_open
-			$HUD.text_hidden = false  # 持ち物を見たいときは、隠した文字も出す
+			$HUD.toggle_inventory()
 		KEY_F1:
-			$HUD.help_open = not $HUD.help_open
-			$HUD.text_hidden = false
+			$HUD.toggle_help()
 		KEY_F2:
 			$HUD.text_hidden = not $HUD.text_hidden  # 文字を隠して景色を眺める(レビュー G10)
 		KEY_1:
