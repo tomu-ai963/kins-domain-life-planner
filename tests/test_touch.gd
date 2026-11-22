@@ -118,8 +118,9 @@ func _test_wording() -> void:
 	# ゲームのすべての文字列で、キーボードの言い方が残らない
 	var leftover := PackedStringArray()
 	var strings := RegEx.create_from_string("\"((?:[^\"\\\\]|\\\\.)*)\"")
-	var keyboard := RegEx.create_from_string("WASD|矢印|ホイール|クリック|Enter|Esc|Tab|F1|SPACE|\\[[0-9A-Z]\\]|(?<![A-Za-z0-9])[A-Z] (で|を)|(?<![A-Za-z0-9])[QEZHCBFPJLXUVKIO](?=[)・])")
+	var keyboard := RegEx.create_from_string("WASD|矢印|ホイール|クリック|Enter|Esc|Tab|F1|SPACE|\\[[0-9A-Z]\\]|(?<![A-Za-z0-9])[A-Z] (で|を)|(?<![A-Za-z0-9])[QEZHCBFPJLXUVKIOY](?=[)・])")
 	var paths := ["res://Main.gd", "res://HUD.gd"]
+	paths.append_array(["res://view/ProfilePicker.gd", "res://view/RegionPicker.gd", "res://view/FamilyPicker.gd", "res://view/FamilyNames.gd"])  # はじめに決める画面と、名前を付け直す画面
 	for file in DirAccess.get_files_at("res://view/main"):  # Main から分けた画面の部品(レビュー C4)
 		if file.ends_with(".gd"):
 			paths.append("res://view/main/" + file)
@@ -150,6 +151,13 @@ func _test_wording_on_screen() -> void:
 	hud.help_open = true
 	_check(hud.status_text().contains("左のスティック") and not hud.status_text().contains("WASD"), "操作説明がタッチのものになる")
 	hud.help_open = false
+	# はじめに決める画面の文言も、タッチではボタンの名前になる
+	hud.open_profile_picker()
+	_check(hud.profile_picker.body_text().contains("メニューの「名前」で付け直せます") and not hud.profile_picker.body_text().contains("Y で"), "自分を決める画面: 「Y で」がメニューの「名前」になる")
+	hud.profile_picker.close()
+	hud.open_family_picker()
+	_check(hud.family_picker._body.text.contains("話しかけると(「話す」)"), "家族を選ぶ画面: 「(C)」が「話す」になる")
+	hud.family_picker.close()
 	hud.show_message("もう一度 Z で伐る")
 	_check(hud._message_label.text == "もう一度「抜く」で伐る", "メッセージがボタンの名前になる")
 	await create_timer(hud.TOUCH_STATUS_SECONDS + 0.1).timeout

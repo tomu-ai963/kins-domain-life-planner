@@ -7,6 +7,7 @@ extends ColorRect
 # 決めたら chosen(名前, 性別)を出す。ルールは logic/Profile.gd、決めたあとの処理は Main
 const Profile = preload("res://logic/Profile.gd")
 const Family = preload("res://logic/Family.gd")
+const TouchText = preload("res://view/TouchText.gd")
 const BUTTON_SIZE := Vector2(190, 40)
 const TOUCH_BUTTON_SIZE := Vector2(210, 52)
 const NAME_WIDTH := 260.0
@@ -78,7 +79,7 @@ func close() -> void:
 func show_input(note := "") -> void:
 	step = "input"
 	_title.text = "あなたのこと"
-	_body.text = note if note != "" else "あなたの名前(%d文字まで)と性別を決めてください。\n名前は日記や、家族・近所の人の言葉に出ます。名前はあとから Y で付け直せます。" % Profile.NAME_MAX
+	_body.text = note if note != "" else _shown("あなたの名前(%d文字まで)と性別を決めてください。\n名前は日記や、家族・近所の人の言葉に出ます。名前はあとから Y で付け直せます。" % Profile.NAME_MAX)
 	_name_edit.visible = true
 	_sex_row.visible = true
 	_refresh_sex()
@@ -114,7 +115,7 @@ func typed_name() -> String:
 func show_confirm() -> void:
 	step = "confirm"
 	_title.text = "%sさんで始めますか" % typed_name()
-	_body.text = "名前: %s\n性別: %s\n(性別はあとから変えられません。名前は Y で付け直せます)" % [typed_name(), Profile.SEX_NAMES[sex]]
+	_body.text = _shown("名前: %s\n性別: %s\n(性別はあとから変えられません。名前は Y で付け直せます)" % [typed_name(), Profile.SEX_NAMES[sex]])
 	_name_edit.visible = false
 	_sex_row.visible = false
 	_clear(2)
@@ -156,6 +157,10 @@ func press(text: String) -> bool:
 
 func type_name(text: String) -> void:
 	_name_edit.text = text
+
+# タッチのときは、キーの言い方をボタンの名前に置き換えて出す(「Y で」→「メニューの「名前」で」)
+func _shown(text: String) -> String:
+	return TouchText.convert(text) if touch_mode else text
 
 func body_text() -> String:
 	return _body.text

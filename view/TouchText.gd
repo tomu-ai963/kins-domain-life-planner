@@ -26,7 +26,7 @@ const KEYS := {
 	"SPACE": "「植える」", "Q": "「水やり」", "E": "「収穫」", "Z": "「抜く」",
 	"C": "「話す」", "B": "「市場」", "U": "「雪かき」", "K": "「ヒント」",
 	"F": "メニューの「菜園」", "P": "メニューの「池」", "I": "メニューの「井戸」", "O": "メニューの「石臼」", "J": "メニューの「巣箱」",
-	"L": "メニューの「餌台」", "X": "メニューの「剪定」", "V": "メニュー",
+	"L": "メニューの「餌台」", "X": "メニューの「剪定」", "V": "メニュー", "Y": "メニューの「名前」",
 }
 
 # H のボタンは家具のそばで「使う」に変わる。家具の話をしている行では、その名前で呼ぶ
@@ -37,7 +37,7 @@ static var _key_regex: RegEx
 static func convert(text: String) -> String:
 	if _key_regex == null:
 		# 「H で」「Z を」のほかに、かっこの中の「(J)」「(E・あと 3 日)」「の前で H)」も置き換える
-		_key_regex = RegEx.create_from_string("(?<![A-Za-z0-9])(SPACE|[QEZHCBFPJLXUVKIO])(?: (?=[でを])|(?=[)・]))")
+		_key_regex = RegEx.create_from_string("(?<![A-Za-z0-9])(SPACE|[QEZHCBFPJLXUVKIOY])(?: (?=[でを])|(?=[)・]))")
 	for p in PHRASES:
 		text = text.replace(p[0], p[1])
 	var lines := text.split("\n")

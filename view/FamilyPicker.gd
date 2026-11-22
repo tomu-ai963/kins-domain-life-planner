@@ -8,6 +8,7 @@ extends ColorRect
 # 決めたら chosen({spouse, spouse_name, kids: [{name, sex, age}]})を出す。ルールは logic/Family.gd、決めたあとの処理は Main
 # クリック・タッチ・矢印キー + Enter で選べる(Button のフォーカス)。名前は文字の欄に打つ(Enter で次へ)
 const Family = preload("res://logic/Family.gd")
+const TouchText = preload("res://view/TouchText.gd")
 const BUTTON_SIZE := Vector2(190, 40)
 const TOUCH_BUTTON_SIZE := Vector2(210, 52)  # 指で押せる大きさ
 const SMALL_BUTTON := Vector2(56, 40)
@@ -115,7 +116,7 @@ func show_spouses() -> void:
 	kids = []
 	child_index = -1
 	_title.text = "一緒に暮らす家族を選んでください"
-	_body.text = "家族は土地で暮らし、毎朝少し手伝ってくれます。話しかけると(C)、ときどき贈り物も。\n名前は自分で付けられます。家族の顔ぶれは、一度決めるとあとから変えられません(名前は付け直せます)。"
+	_body.text = _shown("家族は土地で暮らし、毎朝少し手伝ってくれます。話しかけると(C)、ときどき贈り物も。\n名前は自分で付けられます。家族の顔ぶれは、一度決めるとあとから変えられません(名前は付け直せます)。")
 	_show_form(false, false, false)
 	_clear(2)
 	for id in Family.SPOUSE_ORDER:
@@ -314,6 +315,10 @@ func press(text: String) -> bool:
 # 名前の欄に打つ(テスト用)
 func type_name(text: String) -> void:
 	_name_edit.text = text
+
+# タッチのときは、キーの言い方をボタンの名前に置き換えて出す(「(C)」→「(「話す」)」)
+func _shown(text: String) -> String:
+	return TouchText.convert(text) if touch_mode else text
 
 func name_text() -> String:
 	return _name_edit.text
