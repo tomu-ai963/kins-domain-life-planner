@@ -275,11 +275,13 @@ func _tomorrow_lines() -> PackedStringArray:
 	var wild_drops: Array = world.wilds.dropping_on(world.forest.day_number() + 1)
 	if not wild_drops.is_empty():
 		lines.append("外の林で%sの種が落ちる日(その日だけ拾える)" % main._names_of(wild_drops))
+	if plan.frost > 0:
+		lines.append("明日の霜で枯れる区画: %d(実っていれば今日のうちに収穫を)" % plan.frost)
 	if plan.ripe > 0:
 		lines.append("収穫できる区画: %d" % plan.ripe)
 	if plan.spoiling > 0:
 		lines.append("傷みはじめる区画: %d" % plan.spoiling)
-	var to_water: int = g.crops.size() - plan.ripe
+	var to_water: int = g.crops.size() - plan.ripe - plan.frost
 	if to_water > 0 and not rain:
 		lines.append("水やりがいる区画: %d" % to_water)
 	var fruiting: int = world.forest.ripe_fruit_count(season, 1)

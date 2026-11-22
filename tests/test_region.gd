@@ -157,6 +157,28 @@ func _test_frost() -> void:
 	hk.refresh_season()
 	hk.garden.apply_frost()
 	_check(hk.garden.crops.is_empty() and hk.garden.last_frost.get("radish", 0) == 1, "北海道は 11 月 1 日に霜で枯れる")
+	# 日記の明日の見込みは、明日の霜で枯れる区画を収穫・水やりに数えない(Issue #1)
+	var eve := _world("hokkaido", "2026-10-31")
+	var spot2 := SPOT + Vector2(6, 0)
+	for p in [SPOT, spot2]:
+		eve.land.toggle_plot(p)
+	eve.garden.seeds.radish = 1
+	eve.garden.seeds.spinach = 1
+	eve.garden.sow(SPOT, "radish")
+	eve.garden.sow(spot2, "spinach")
+	for c in eve.garden.crops:
+		c.sown_day -= 10  # どちらも明日には実っている
+	var plan: Dictionary = eve.garden.tomorrow_counts()
+	_check(plan.frost == 1 and plan.ripe == 1, "10/31 の見込み: ラディッシュは霜で枯れる 1、ホウレンソウ(霜に強い)は収穫 1(frost %d・ripe %d)" % [plan.frost, plan.ripe])
+	eve.time.set_today("2026-11-01")
+	eve.refresh_season()
+	eve.garden.apply_frost()
+	_check(eve.garden.last_frost.get("radish", 0) == plan.frost and eve.garden.crops.size() == 1 and eve.garden.crops[0].kind == "spinach" and eve.garden.is_ripe(eve.garden.crops[0]), "11/1 の実際も見込みと同じ(枯れたのはラディッシュだけ・ホウレンソウは実っている)")
+	var tk_eve := _world("tokyo", "2026-10-31")
+	tk_eve.land.toggle_plot(SPOT)
+	tk_eve.garden.seeds.radish = 1
+	tk_eve.garden.sow(SPOT, "radish")
+	_check(tk_eve.garden.tomorrow_counts().frost == 0, "東京の 10/31 は明日の霜で枯れる区画がない")
 	var tk := _world("tokyo", "2026-11-01")
 	tk.land.toggle_plot(SPOT)
 	tk.garden.seeds.radish = 1

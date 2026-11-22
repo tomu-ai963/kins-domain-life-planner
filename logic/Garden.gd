@@ -389,11 +389,15 @@ func _growth_tomorrow(c: Dictionary) -> float:
 	var elapsed: int = day_number() + 1 - int(c.sown_day)
 	return grown_days(elapsed, int(c.water_days), dry_rate(c.kind)) + float(c.get("head", 0.0))
 
-# 明日の畑の見込み(日記用)。ripe: 収穫できる区画(今できているものも含む) / spoiling: 明日傷みはじめる区画
-# 明日の霜で枯れる分はここでは引かない(霜は frost_is_near で別に知らせる)
+# 明日の畑の見込み(日記用)。ripe: 収穫できる区画(今できているものも含む) / spoiling: 明日傷みはじめる区画 /
+# frost: 明日の霜で枯れる区画(この区画は ripe・spoiling に数えない。枯れるかは apply_frost と同じ _frost_kills で決める)
 func tomorrow_counts() -> Dictionary:
-	var counts := {"ripe": 0, "spoiling": 0}
+	var counts := {"ripe": 0, "spoiling": 0, "frost": 0}
+	var tomorrow: int = day_number() + 1
 	for c in crops:
+		if _frost_kills(c, tomorrow, _is_frost_day(tomorrow)):
+			counts.frost += 1
+			continue
 		var over: float = _growth_tomorrow(c) - float(CROPS[c.kind].grow_days)
 		if over >= 0.0:
 			counts.ripe += 1
@@ -426,13 +430,18 @@ func apply_frost() -> void:
 	var today: int = day_number()
 	for i in range(crops.size() - 1, -1, -1):
 		var c: Dictionary = crops[i]
-		if CROPS[c.kind].get("hardy", false):
-			continue
-		if (forest.season == "winter" and forest.climate().has_frost()) or _winter_between(int(c.sown_day), today):
+		if _frost_kills(c, today, forest.season == "winter" and forest.climate().has_frost()):
 			last_frost[c.kind] = int(last_frost.get(c.kind, 0)) + 1
 			crops.remove_at(i)
 	if not last_frost.is_empty():
 		_commit()
+
+# その日の確認で霜で枯れるか。frost_now: その日が霜の日か(霜に強い野菜は枯れない)。
+# まいた日からその日の前の日までに霜の日があっても枯れている(閉じているあいだに冬が過ぎた)
+func _frost_kills(c: Dictionary, day: int, frost_now: bool) -> bool:
+	if CROPS[c.kind].get("hardy", false):
+		return false
+	return frost_now or _winter_between(int(c.sown_day), day)
 
 # from から to の前の日までに、霜の降りる日(土地の冬の日。今までのルールでは 12〜2 月)があるか
 func _winter_between(from: int, to: int) -> bool:
