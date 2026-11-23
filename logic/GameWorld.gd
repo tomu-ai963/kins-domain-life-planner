@@ -2,7 +2,7 @@ extends RefCounted
 
 # ── ゲーム全体の状態(描画を持たない) ──────────────────────────
 # 木と種(Forest)・菜園と池の場所(Land)・畑の野菜(Garden)・池の作り込み(Pond)・小屋(Cabin)・段階クエスト(Quests)・お金と市場(Market)などをまとめ、
-# 1 つのセーブファイルに読み書きする。保存が必要な変更(dirty)を出す 19 の部品(_init の dirty.connect の並び)で自動保存する。
+# 1 つのセーブファイルに読み書きする。保存が必要な変更(dirty)を出す 20 の部品(_init の dirty.connect の並び)で自動保存する。
 # 今日の日付と時刻は WorldTime(time)から読む
 # 座標の単位は m(ドメイン中心が原点、境界は ±50m)
 const Forest = preload("res://logic/Forest.gd")
@@ -33,6 +33,7 @@ const Pests = preload("res://logic/Pests.gd")
 const River = preload("res://logic/River.gd")
 const Family = preload("res://logic/Family.gd")
 const Profile = preload("res://logic/Profile.gd")
+const Memorials = preload("res://logic/Memorials.gd")
 
 const SAVE_PATH := "user://kins_domain_save.json"
 # セーブの版(2026-11-11 から書く。レビュー S4)。セーブの形を変える変更(名前・単位を変える、意味を変える)をしたら 1 上げ、
@@ -75,6 +76,7 @@ var pests := Pests.new()         # 畑を荒らす生き物と仲良し度(2026-
 var river := River.new()         # 土地の外の川(2026-11-15。県を選んでから。保存しない)
 var family := Family.new()       # 家族(2026-11-16。はじめに 1 度だけ選ぶ)
 var profile := Profile.new()     # 自分の名前と性別(2026-11-16。いちばんはじめに 1 度だけ決める)
+var memorials := Memorials.new() # 記念樹と歳時記(2026-11-23)
 var last_pumped := [0, 0]        # 直前にポンプでまとめて水をやった [区画の数, 木の数](文言用・保存しない)
 var is_new_game := false         # 読み込むセーブがなかった(新しく始めた)。県を選んだときに、その土地のはじめの種を配る
 var sound_level := 3             # 音量の段階(0 = 消す、3 = いちばん大きい)。見た目の設定で、ルールには使わない
@@ -208,6 +210,9 @@ func _init() -> void:
 	pests.dirty.connect(save_game)
 	family.dirty.connect(save_game)
 	profile.dirty.connect(save_game)
+	memorials.dirty.connect(save_game)
+	memorials.forest = forest
+	forest.tree_removed.connect(memorials.on_tree_removed)
 
 # 区画(中心 c)を田んぼにできるか: 川か、掘り終えた池から水が引ける範囲(ポンプで水が届く 20m)
 func _paddy_ok(c: Vector2) -> bool:
@@ -553,6 +558,7 @@ func save_game() -> void:
 	data["pests"] = pests.to_save()
 	data["family"] = family.to_save()
 	data["profile"] = profile.to_save()
+	data["memorials"] = memorials.to_save()
 	var ok := _write_save(JSON.stringify(data))
 	if not ok and not _save_failing:
 		save_failed.emit("保存できなかった(%s)。空き容量やフォルダの書き込みを確かめてほしい。直るまで、閉じると今日の分が残らないかもしれない" % ProjectSettings.globalize_path(save_path).get_base_dir())
@@ -704,6 +710,7 @@ func load_game() -> void:
 	profile.from_save(SaveRead.dict(data.get("profile")))  # 自分の記録がないセーブ(2026-11-16 より前)は、開いたときに一度だけ決める
 	family.from_save(SaveRead.dict(data.get("family")))  # 家族の記録がないセーブ(2026-11-16 より前)は、開いたときに一度だけ選ぶ
 	family.ensure_tent()
+	memorials.from_save(SaveRead.dict(data.get("memorials")))  # 記念樹の記録がないセーブ(2026-11-23 より前)は、記念樹なしから
 
 # 今のセーブを「名前.infix日付_時刻.json」として写して残す。残した名前を返す
 func _keep_copy(infix: String) -> String:

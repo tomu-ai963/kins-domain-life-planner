@@ -41,6 +41,7 @@ func _process(_delta: float) -> bool:
 			_test_3d_well()
 			_test_3d_mill()
 			_test_fell_confirm()
+			_test_tree_memorial_view()
 			_test_hud()
 			_test_near_action()
 			_test_plot_limit()
@@ -3240,6 +3241,70 @@ func _test_fell_confirm() -> void:
 	n = f.trees.size()
 	main._remove()
 	_check(f.trees.size() == n - 1, "まいたばかりの種は 1 回で抜ける")
+
+# ── 記念樹(2026-11-23) ─────────────────────────────────────────
+func _test_tree_memorial_view() -> void:
+	print("記念樹")
+	var w = main.world
+	var f = w.forest
+	var hud = main.get_node("HUD")
+	var player = main.get_node("Player")
+	var spot := Vector2(-30, 30)
+	_check(f.nearest_index(spot, 3.0, "") < 0, "テストの場所のまわりに木がない")
+	f.saplings.konara = 0
+	f.saplings.birch = 1
+	f.add_tree(spot, "birch", "sapling")
+	var tree: Dictionary = f.trees[-1]
+	player.global_position = Vector3(spot.x + 1.0, 0, spot.y)
+	_check(main.memorial_line() == "", "名前を付ける前は、そばを通っても何も出ない")
+	_press(KEY_Y)
+	_check(hud.tree_memorial.visible and hud.is_picker_open() and not player.is_physics_processing(), "木のそばの Y で記念樹の画面が開き、そのあいだは歩かない")
+	_check(not hud.family_names.visible, "家族の名前の画面は開かない")
+	_check(hud.tree_memorial.info_text().begins_with("白樺") and hud.tree_memorial.info_text().contains("今日植えた"), "画面に木の 1 行(%s)" % hud.tree_memorial.info_text())
+	_check(hud.tree_memorial.chronicle_text().contains("まだ記念樹はありません"), "歳時記はまだ空")
+	hud.tree_memorial.type_text("長男の木", "春の朝、みんなで植えた")
+	hud.tree_memorial.press("決める")
+	_check(not hud.tree_memorial.visible and player.is_physics_processing(), "決めると閉じて、歩ける")
+	_check(hud._message.contains("白樺を記念樹「長男の木」にした"), "記念樹にしたと知らせる")
+	_check(main.memorial_line() == "記念樹「長男の木」白樺・今日植えた  春の朝、みんなで植えた", "そばを通ると名前とメモが出る(%s)" % main.memorial_line())
+	_check(hud._status_lines().has(main.memorial_line()), "PC の左上に出る")
+	var visit_before: Dictionary = w.visitors.visit
+	w.visitors.visit = {}  # 訪問者の案内は 3 行目で先に出るので、来ていない日にする
+	hud.touch_mode = true
+	_check(hud._here_line() == main.memorial_line(), "タッチの 3 行目にも出る(%s)" % hud._here_line())
+	hud.touch_mode = false
+	w.visitors.visit = visit_before
+	player.global_position = Vector3(spot.x + 5.0, 0, spot.y)
+	_check(main.memorial_line() == "", "離れると出ない")
+	player.global_position = Vector3(spot.x + 1.0, 0, spot.y)
+	_press(KEY_Y)
+	_check(hud.tree_memorial.chronicle_text().contains("白樺「長男の木」  春の朝、みんなで植えた"), "歳時記に記録が出る")
+	hud.tree_memorial.type_text("べつの名前")
+	hud.tree_memorial.press("やめる")
+	_check(w.memorials.record_for(tree).name == "長男の木" and player.is_physics_processing(), "やめると何も変わらない")
+	# 伐る前の確認に、記念樹と出る。伐っても歳時記には残る
+	tree.start_age = 20.0
+	main._fell_deadline = 0.0
+	main._remove()
+	_check(hud._message.contains("もう一度 Z で伐る: 記念樹「長男の木」の白樺"), "伐る前の確認に記念樹の名前(%s)" % hud._message)
+	var axe_before: int = w.tools.axe_count
+	main._remove()
+	w.tools.axe_count = axe_before  # 斧の 1 日の本数を、あとのテストのために戻す
+	_check(f.tree_by_id(int(tree.id)).is_empty() and main.memorial_line() == "", "伐ると、そばの 1 行は消える")
+	_check(main.tree_memorials.chronicle_lines()[-1].contains("「長男の木」") and main.tree_memorials.chronicle_lines()[-1].contains("になくなった"), "歳時記には、なくなった日と一緒に残る")
+	# 木のないところの Y は、今までどおり自分と家族の名前
+	_press(KEY_Y)
+	_check(not hud.tree_memorial.visible, "木のないところの Y では記念樹の画面は開かない")
+	if hud.family_names.visible:
+		hud.family_names.press("やめる")
+	player.set_physics_process(true)
+	# 芽が出る前の種には付けられない
+	f.seeds.birch = 1
+	f.add_tree(spot, "birch", "seed")
+	_press(KEY_Y)
+	_check(not hud.tree_memorial.visible and hud._message.contains("芽が出てから"), "芽が出る前の種には名前を付けられない")
+	f.remove_nearest(spot, 1.0)
+	w.memorials.records.clear()
 
 func _press(keycode: int) -> void:
 	var e := InputEventKey.new()

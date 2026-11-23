@@ -15,6 +15,7 @@ const VisitorTalk = preload("res://view/main/VisitorTalk.gd")
 const FamilyTalk = preload("res://view/main/FamilyTalk.gd")
 const KitchenPanel = preload("res://view/main/KitchenPanel.gd")
 const MarketPanel = preload("res://view/main/MarketPanel.gd")
+const TreeMemorials = preload("res://view/main/TreeMemorials.gd")
 const REACH := 2.0    # 足元 2m 以内
 const PICKUP_RADIUS := 1.2  # 落ちている種は、これだけ近づくと拾う
 const FELL_CONFIRM_SECONDS := 4.0  # 根付いた木は、この時間内にもう一度 Z を押すと伐れる
@@ -57,6 +58,7 @@ var visitor_talk := VisitorTalk.new(self)
 var family_talk := FamilyTalk.new(self)
 var kitchen_panel := KitchenPanel.new(self)
 var market_panel := MarketPanel.new(self)
+var tree_memorials := TreeMemorials.new(self)
 
 func _ready() -> void:
 	# 本物のセーブのときだけ控えを取る(テストや確認用のセーブでは取らない)
@@ -79,6 +81,8 @@ func _ready() -> void:
 	$HUD.profile_chosen.connect(_on_profile_chosen)
 	$HUD.family_renamed.connect(family_talk._on_family_renamed)
 	$HUD.family_names_closed.connect(func(): $Player.set_physics_process(true))
+	$HUD.tree_named.connect(tree_memorials._on_tree_named)
+	$HUD.tree_memorial_closed.connect(tree_memorials._on_closed)
 	$Player.plant_tree.connect(_on_plant_tree)
 	world.save_failed.connect(func(message: String): $HUD.show_message(message, 15.0))
 	_setup_3d_only()
@@ -541,6 +545,10 @@ func _prune() -> void:
 			$HUD.show_message("%sはこの冬もう剪定した" % fruit_name)
 
 # HUD に出す、果樹のそばの 1 行(冬だけ)。そばにいなければ ""
+# 左上に出す、そばの記念樹の 1 行(中身は tree_memorials)
+func memorial_line() -> String:
+	return tree_memorials.memorial_line()
+
 func prune_line() -> String:
 	var f := world.forest
 	if f.season != "winter" or f.time_offset_years > 0.0:
@@ -1735,7 +1743,7 @@ func _needs_fell_confirm(pos: Vector2) -> bool:
 	_fell_deadline = now + FELL_CONFIRM_SECONDS
 	var logs: int = f.wood_yield(tree)
 	var wood := "丸太%d本" % logs if logs > 0 else "細くて丸太にはならない"
-	$HUD.show_message("もう一度 Z で伐る: %s 樹齢%d年(%s)" % [f.SPECIES[tree.species].name, int(f.real_age_years(tree)), wood], FELL_CONFIRM_SECONDS)
+	$HUD.show_message("もう一度 Z で伐る: %s%s 樹齢%d年(%s)" % [tree_memorials.fell_prefix(tree), f.SPECIES[tree.species].name, int(f.real_age_years(tree)), wood], FELL_CONFIRM_SECONDS)
 	return true
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -1805,7 +1813,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_O:
 			_mill_action()
 		KEY_Y:
-			family_talk._open_family_names()
+			tree_memorials.open_names()  # 木のそばなら記念樹、なければ自分と家族の名前
 		KEY_T:
 			world.forest.advance_years(1.0)   # 1年先送り(プレビュー。保存しない)
 		KEY_G:

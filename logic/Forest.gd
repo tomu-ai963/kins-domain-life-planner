@@ -13,6 +13,8 @@ signal dirty    # セーブに入る状態が変わった
 # 日付・季節・先送りプレビューが変わった。畑・池・小屋など、木ではなく日付で見た目が変わる表示はこちらを聞く。
 # changed を聞くと、木に水をやるたびに作り直すことになる(レビュー M2)
 signal calendar_changed
+# 木が土地からなくなった(伐った・抜いた・芽が出なかった)。記念樹の記録(logic/Memorials.gd)が、伐った日を残すのに聞く
+signal tree_removed(tree: Dictionary)
 
 # ── 現実時間で成長するシステム ──────────────────────────────
 # 1 現実日 = 樹齢 1 年。アプリを閉じている間も現実時間ぶん育つ。
@@ -380,8 +382,9 @@ var region = null  # Region(GameWorld が設定する)。季節・植えられ�
 var _legacy := Region.new()  # 県を選ぶ前の気候(今までのルール)
 # [{pos: Vector2(m), species, form: "seed"/"sapling"/""(移行前の木), planted_at: int,
 #   start_age: float(苗木の樹齢), sprouts: bool(種が芽を出すか), last_harvest, last_watered, bonus_years,
-#   pruned_year: int(剪定が効く収穫の年。0 = まだ)}]
+#   pruned_year: int(剪定が効く収穫の年。0 = まだ), id: int(木の番号。配列の順番が変わっても変わらない。2026-11-23)}]
 var trees := []
+var next_tree_id := 1  # 次に植える木の番号(伐っても番号は使い回さない)
 var seeds := initial_seeds()      # 樹種ごとの種の所持数
 var saplings := zero_counts()     # 樹種ごとの苗木の所持数
 var produce := fruit_counts()     # 果樹ごとの収穫物(市場で売る)
@@ -515,6 +518,7 @@ func add_tree(pos: Vector2, species: String, form := "seed") -> bool:
 		"pos": pos, "species": species, "form": form, "planted_at": now,
 		"start_age": start_age, "sprouts": sprouts,
 		"last_harvest": "", "last_watered": "", "bonus_years": 0.0, "pruned_year": 0,
+		"id": _take_id(),
 	})
 	# 雨の日は一日中降っている扱い。あとから植えた木も水やり済みにする
 	if is_raining():
@@ -630,6 +634,7 @@ func check_new_day() -> String:
 		if has_failed(trees[i]):
 			var sp: String = trees[i].species
 			last_failed[sp] = int(last_failed.get(sp, 0)) + 1
+			tree_removed.emit(trees[i])
 			trees.remove_at(i)
 	drop_seeds(t)
 	today_event = roll_daily_event(t)
@@ -873,10 +878,23 @@ func wood_yield(tree: Dictionary) -> int:
 func remove_nearest(pos: Vector2, max_dist: float) -> bool:
 	var best := nearest_index(pos, max_dist, "")
 	if best >= 0:
+		tree_removed.emit(trees[best])
 		trees.remove_at(best)
 		_commit()
 		return true
 	return false
+
+# 新しい木の番号を 1 つ取る
+func _take_id() -> int:
+	next_tree_id += 1
+	return next_tree_id - 1
+
+# 番号から今ある木を探す。なければ {}(伐った木など)
+func tree_by_id(id: int) -> Dictionary:
+	for t in trees:
+		if int(t.get("id", 0)) == id:
+			return t
+	return {}
 
 func advance_years(years: float) -> void:
 	time_offset_years += years
@@ -919,6 +937,7 @@ func to_save() -> Dictionary:
 	var data := {
 		"seeds": seeds, "saplings": saplings, "produce": produce,
 		"last_day": last_day, "today_event": today_event, "trees": [], "pickups": [],
+		"next_tree_id": next_tree_id,
 	}
 	for t in trees:
 		data.trees.append({
@@ -928,6 +947,7 @@ func to_save() -> Dictionary:
 			"last_harvest": t.last_harvest,
 			"last_watered": t.last_watered, "bonus_years": t.bonus_years,
 			"pruned_year": int(t.get("pruned_year", 0)),
+			"id": int(t.get("id", 0)),
 		})
 	for p in pickups:
 		data.pickups.append({"x": p.pos.x, "y": p.pos.y, "species": p.species, "amount": p.amount})
@@ -971,7 +991,21 @@ func from_save(data: Dictionary) -> void:
 			"last_watered": SaveRead.text(t, "last_watered"),
 			"bonus_years": maxf(0.0, SaveRead.num(t, "bonus_years")),
 			"pruned_year": SaveRead.whole(t, "pruned_year"),
+			"id": SaveRead.whole(t, "id"),
 		})
+	# 木の番号(2026-11-23 から)。番号のない木(前のセーブ)と、ほかの木と重なった番号の木には、新しい番号を付ける。
+	# 次の番号は、保存してある数と、今ある木の番号のうち大きいほうの次から(伐った木の番号を使い回さない)
+	next_tree_id = maxi(1, SaveRead.whole(data, "next_tree_id", 1))
+	var used := {}
+	for t in trees:
+		if t.id > 0 and not used.has(t.id):
+			used[t.id] = true
+			next_tree_id = maxi(next_tree_id, t.id + 1)
+		else:
+			t.id = 0
+	for t in trees:
+		if t.id == 0:
+			t.id = _take_id()
 	pickups.clear()
 	for item in SaveRead.list(data.get("pickups")):
 		var p := SaveRead.dict(item)
