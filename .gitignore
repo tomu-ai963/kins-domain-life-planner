@@ -19,3 +19,6 @@ Thumbs.db
 
 # Editor temp files
 *.tmp
+
+# シミュレーションの書き出し(tools/sim/run_sim.gd)
+sim_out/
