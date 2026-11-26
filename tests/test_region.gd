@@ -711,7 +711,11 @@ func _run_scene() -> void:
 	_check(ids0.has("cook_hoshigaki") and ids0.has("cook_jam") and not ids0.has("cook_takuan"), "ストーブの 1 ページ目は果物とはちみつ(材料を持っていれば、土地に育たない果物の料理も出る)")
 	main._on_shop_action("page_cook")
 	var ids1: Array = main.visible_shop_rows().map(func(r): return r.id)
-	_check(main.kitchen_panel._cook_page == 1 and ids1.has("cook_takuan") and ids1.has("cook_goya_champuru") and not ids1.has("cook_hoshigaki"), "押すと野菜の料理のページ")
+	_check(main.kitchen_panel._cook_page == 1 and ids1.has("cook_takuan") and not ids1.has("cook_goya_champuru") and not ids1.has("cook_hoshigaki"), "押すと根菜・いも・香味の料理のページ")
+	main._on_shop_action("page_cook")
+	var ids2: Array = main.visible_shop_rows().map(func(r): return r.id)
+	_check(main.kitchen_panel._cook_page == 2 and ids2.has("cook_goya_champuru") and ids2.has("cook_ohitashi") and not ids2.has("cook_takuan"), "次は実もの・葉もの・豆の料理のページ(日本料理も並ぶ)")
+	main.kitchen_panel._cook_page = 1
 	main._on_shop_action("cook_takuan")
 	_check(k.pot.get("recipe", "") == "takuan", "たくあんを仕込める")
 	main._panel = "market"

@@ -130,6 +130,7 @@ const SELL_PRICES := {
 	# 穀物と粉の料理。材料を売るよりおよそ 2 倍(今までと同じ置き方)
 	"rye_bread": 70, "bliny": 20, "udon": 40, "soba_noodle": 68, "kibi_dango": 24, "kasha": 45,
 	"onigiri": 25,  # 米 1kg → 4 個。材料を売るよりおよそ 2 倍
+	"kinpira": 30, "senmaizuke": 34, "piman_yakibitashi": 50, "ohitashi": 60, "nibitashi": 60, "yaki_corn": 60, "tamanegi_amazu": 34, "negi_miso": 40,  # 日本料理(2026-11-26)。材料を売るよりおよそ 2 倍
 	"shiitake": 25, "hoshi_shiitake": 250,  # 生のシイタケは 1 個、干し椎茸は 1 袋(10 個 → 2 袋。材料を売るより 2 倍)。2026-11-26 の仮の数字
 	# 自然の木の種(seed_ + 樹種。1 粒あたり。2026-11-11 とむ決定: 売れるが買えない)。外の林で年に数日しか拾えないので、市場の種より少し高い
 	"seed_buna": 15, "seed_mizunara": 8, "seed_harunire": 4, "seed_nanakamado": 6, "seed_oyamazakura": 8, "seed_yamazakura": 8,

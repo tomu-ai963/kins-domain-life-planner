@@ -17,7 +17,7 @@ var hud: Node:
 const POT_NAMES := ["鍋", "かまどの鍋"]      # 母屋のストーブの鍋 / 増築した部屋のかまどの鍋
 const POT_PLACES := ["ストーブ", "かまど"]
 # ストーブと腰掛けの画面のページ(料理が増えて 1 列 15 行を超えるため分けた。材料が果物かはちみつか、野菜か)
-const COOK_PAGES := ["果物とはちみつ", "野菜", "穀物と粉・きのこ"]
+const COOK_PAGES := ["果物とはちみつ", "根菜・いも・香味", "実もの・葉もの・豆", "穀物と粉・きのこ"]  # 野菜は 2026-11-26 に 2 つに分けた(日本料理を足して 15 行を超えるため)
 var _cook_page := 0          # ストーブと腰掛けの画面の今のページ(COOK_PAGES)
 
 func _init(m: MainScript) -> void:
@@ -195,8 +195,10 @@ func _effects_text() -> String:
 # ストーブと腰掛けの料理のページ
 func _cook_page_of(id: String) -> int:
 	if world.kitchen.from_grain(id) or world.kitchen.from_mushroom(id):
-		return 2
-	return 0 if world.kitchen.from_tree(id) else 1
+		return 3
+	if world.kitchen.from_tree(id):
+		return 0
+	return 1 if world.kitchen.from_root(id) else 2
 
 # ストーブの画面に並べる料理: この土地で材料が採れるか、材料かできた品を持っている
 func _recipe_shown(id: String) -> bool:

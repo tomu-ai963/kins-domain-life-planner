@@ -29,7 +29,7 @@ const BUY_PAGES := [
 	{"name": "道具と燃料", "forms": ["tool", "fuel", "straw"]},
 ]
 # 売る列のページ。果物ははちみつも、実もの野菜は苗も。野菜の組は SELL_GROUPS(果樹と野菜が増えて 1 列 15 行を超えるため分けた)
-const SELL_PAGES := ["果物", "根菜といも", "実もの野菜と苗", "葉もの・香味野菜", "豆と穀物と粉", "果物とはちみつの保存食", "野菜の保存食", "穀物と粉・きのこの料理", "自然の木の種 1", "自然の木の種 2"]
+const SELL_PAGES := ["果物", "根菜といも", "実もの野菜と苗", "葉もの・香味野菜", "豆と穀物と粉", "果物とはちみつの保存食", "根菜・いも・香味の料理", "実もの・葉もの・豆の料理", "穀物と粉・きのこの料理", "自然の木の種 1", "自然の木の種 2"]
 const WILD_SEEDS_PER_PAGE := 10  # 自然の木の種の売る列は 10 種類ずつ(ほかの土地の種を持つこともあるので)
 const SELL_GROUPS := {"root": 1, "imo": 1, "fruit": 2, "leaf": 3, "bean": 4, "aroma": 3}
 var _buy_page := 0           # 市場の買う列の今のページ(閉じても覚えておく)
@@ -116,7 +116,9 @@ func _sell_page_of(item: String) -> int:
 	if world.kitchen.RECIPES.has(item):
 		if world.kitchen.from_grain(item) or world.kitchen.from_mushroom(item):
 			return SELL_PAGES.find("穀物と粉・きのこの料理")
-		return SELL_PAGES.find("果物とはちみつの保存食" if world.kitchen.from_tree(item) else "野菜の保存食")
+		if world.kitchen.from_tree(item):
+			return SELL_PAGES.find("果物とはちみつの保存食")
+		return SELL_PAGES.find("根菜・いも・香味の料理" if world.kitchen.from_root(item) else "実もの・葉もの・豆の料理")  # 2026-11-26 に 2 つに分けた
 	if item.begins_with("flour_"):
 		return SELL_PAGES.find("豆と穀物と粉")
 	if world.forest.FRUITS.has(item) or item == "honey" or item == "shiitake":

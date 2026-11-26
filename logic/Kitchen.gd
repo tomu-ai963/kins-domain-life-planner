@@ -70,6 +70,15 @@ const RECIPES := {
 	"soba_noodle": {"name": "手打ちそば", "input": "flour_soba", "amount": 1, "output": 4, "unit": "皿", "days": 1, "meal": "strength"},
 	"kibi_dango": {"name": "きびだんご", "input": "flour_kibi", "amount": 1, "output": 10, "unit": "個", "days": 1, "meal": "sweet"},
 	"kasha": {"name": "そばの実のカーシャ", "input": "soba", "amount": 1, "output": 4, "unit": "皿", "days": 1, "meal": "warm"},  # ロシアのそばの実の粥(粉にしない)
+	# ── 日本料理(2026-11-26 とむ「日本料理を足して」)。料理のなかった野菜に 1 品ずつ。漬ける品は 3 日、ほかは 1 日 ──
+	"kinpira": {"name": "きんぴらにんじん", "input": "carrot", "amount": 3, "output": 4, "unit": "皿", "days": 1, "meal": "strength"},
+	"senmaizuke": {"name": "カブの千枚漬け", "input": "kabu", "amount": 4, "output": 6, "unit": "瓶", "days": 3, "meal": "pickle"},
+	"piman_yakibitashi": {"name": "ピーマンの焼きびたし", "input": "pepper", "amount": 2, "output": 4, "unit": "皿", "days": 1, "meal": "strength"},
+	"ohitashi": {"name": "ほうれん草のおひたし", "input": "spinach", "amount": 2, "output": 4, "unit": "皿", "days": 1, "meal": "strength"},
+	"nibitashi": {"name": "小松菜の煮びたし", "input": "komatsuna", "amount": 3, "output": 4, "unit": "皿", "days": 1, "meal": "warm"},
+	"yaki_corn": {"name": "焼きとうもろこし", "input": "corn", "amount": 2, "output": 4, "unit": "本", "days": 1, "meal": "strength"},
+	"tamanegi_amazu": {"name": "玉ねぎの甘酢漬け", "input": "onion", "amount": 5, "output": 6, "unit": "瓶", "days": 3, "meal": "pickle"},
+	"negi_miso": {"name": "ねぎ味噌", "input": "negi", "amount": 2, "output": 4, "unit": "瓶", "days": 1, "meal": "warm"},
 	"hoshi_shiitake": {"name": "干し椎茸", "input": "shiitake", "amount": 10, "output": 2, "unit": "袋", "days": 3, "meal": "warm"},  # 原木のシイタケを干す(2026-11-26)。だしにして温まる
 	"onigiri": {"name": "おにぎり", "input": "rice", "amount": 1, "output": 4, "unit": "個", "days": 1, "meal": "strength"},  # 田んぼの米を炊いて握る(2026-11-15)
 }
@@ -132,6 +141,10 @@ static func from_grain(id: String) -> bool:
 # 材料がシイタケか(画面のページ分け用。野菜と果物のページは 15 行いっぱいなので、穀物と粉のページに入れる。2026-11-26)
 static func from_mushroom(id: String) -> bool:
 	return RECIPES[id].input == "shiitake"
+
+# 野菜の料理のうち、材料が根菜・いも・香味野菜か(画面のページ分け用。違えば実もの・葉もの・豆。2026-11-26 に野菜のページを 2 つに分けた)
+static func from_root(id: String) -> bool:
+	return str(Garden.CROPS.get(RECIPES[id].input, {}).get("group", "")) in ["root", "imo", "aroma"]
 
 # 材料が果物かはちみつか(画面のページ分け用。違えば野菜)
 static func from_tree(id: String) -> bool:

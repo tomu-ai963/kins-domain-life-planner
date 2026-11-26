@@ -73,6 +73,10 @@ const FOOD_COLORS := {
 	"rye_bread": Color(0.36, 0.24, 0.16), "bliny": Color(0.94, 0.78, 0.46), "udon": Color(0.96, 0.94, 0.88),
 	"soba_noodle": Color(0.56, 0.48, 0.40), "kibi_dango": Color(0.96, 0.86, 0.48), "kasha": Color(0.62, 0.44, 0.28), "onigiri": Color(0.96, 0.96, 0.92),
 	"hoshi_shiitake": Color(0.40, 0.28, 0.18),  # 干し椎茸(2026-11-26)
+	# 日本料理(2026-11-26)
+	"kinpira": Color(0.86, 0.46, 0.18), "senmaizuke": Color(0.94, 0.92, 0.84), "piman_yakibitashi": Color(0.30, 0.56, 0.22),
+	"ohitashi": Color(0.24, 0.48, 0.20), "nibitashi": Color(0.32, 0.54, 0.26), "yaki_corn": Color(0.92, 0.74, 0.24),
+	"tamanegi_amazu": Color(0.92, 0.86, 0.76), "negi_miso": Color(0.52, 0.36, 0.20),
 }
 
 var cabin: Cabin

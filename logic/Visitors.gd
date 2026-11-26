@@ -36,10 +36,10 @@ const HELP_MONEY := 200           # まける種がない冬に分けてくれ�
 # role: 役どころ(文言用) / likes: 頼みたいもの(先頭ほど頼みやすい)。なければ、渡せるものの中から頼む
 # id はセーブの親しさの印(前のロシアの名前のころの id のまま。名前ではない)
 const CAST := {
-	"nina": {"role": "畑をやっている近所の人", "likes": ["tomato", "cucumber", "carrot", "radish", "potato", "plum"]},
-	"fyodor": {"role": "養蜂家", "likes": ["garlic", "apple", "pear", "garlic_pickle", "potato", "carrot"]},
-	"tanya": {"role": "近所の子ども", "likes": ["honey", "cherry", "apple", "pirozhki", "jam", "cherry_jam", "pryanik", "carrot", "radish"]},
-	"pavel": {"role": "配達の人", "likes": ["sauce", "pickles", "jam", "plum_jam", "pear_compote", "sbiten", "tomato", "cucumber"]},
+	"nina": {"role": "畑をやっている近所の人", "likes": ["tomato", "cucumber", "carrot", "radish", "potato", "plum", "nibitashi", "kinpira"]},
+	"fyodor": {"role": "養蜂家", "likes": ["garlic", "apple", "pear", "garlic_pickle", "potato", "carrot", "negi_miso", "senmaizuke"]},
+	"tanya": {"role": "近所の子ども", "likes": ["honey", "cherry", "apple", "pirozhki", "jam", "cherry_jam", "pryanik", "carrot", "radish", "yaki_corn"]},
+	"pavel": {"role": "配達の人", "likes": ["sauce", "pickles", "jam", "plum_jam", "pear_compote", "sbiten", "tomato", "cucumber", "ohitashi", "tamanegi_amazu"]},
 }
 # 地方ごとの名前(大人は名字 + さん、子どもは下の名前 + ちゃん)。地方は Region.AREAS の並び。沖縄は九州と分ける。
 # 名字はその地方に多いものから選んだ(仮。とむの確認待ち)。県を選ぶ前は日本のまんなかあたり(中部)
@@ -71,7 +71,8 @@ const ASK := {
 	# 穀物と粉の料理(2026-11-14)
 	"wheat": 2, "rye": 2, "soba": 1, "kibi": 1, "rice": 2,
 	"rye_bread": 1, "bliny": 3, "udon": 2, "soba_noodle": 1, "kibi_dango": 3, "kasha": 1, "onigiri": 3,
-	"shiitake": 5, "hoshi_shiitake": 1,  # 原木シイタケ(2026-11-26)
+	"shiitake": 5, "hoshi_shiitake": 1,
+	"kinpira": 2, "senmaizuke": 2, "piman_yakibitashi": 1, "ohitashi": 2, "nibitashi": 2, "yaki_corn": 3, "tamanegi_amazu": 2, "negi_miso": 1,  # 日本料理(2026-11-26)  # 原木シイタケ(2026-11-26)
 }
 const BEEKEEPER := "fyodor"  # 蜂を分けてくれる人
 const FIREWOOD := "firewood"   # 冬の頼みごとの薪(Kitchen.firewood。市場では売れない)
