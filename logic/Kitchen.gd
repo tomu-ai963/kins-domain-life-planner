@@ -70,6 +70,7 @@ const RECIPES := {
 	"soba_noodle": {"name": "手打ちそば", "input": "flour_soba", "amount": 1, "output": 4, "unit": "皿", "days": 1, "meal": "strength"},
 	"kibi_dango": {"name": "きびだんご", "input": "flour_kibi", "amount": 1, "output": 10, "unit": "個", "days": 1, "meal": "sweet"},
 	"kasha": {"name": "そばの実のカーシャ", "input": "soba", "amount": 1, "output": 4, "unit": "皿", "days": 1, "meal": "warm"},  # ロシアのそばの実の粥(粉にしない)
+	"hoshi_shiitake": {"name": "干し椎茸", "input": "shiitake", "amount": 10, "output": 2, "unit": "袋", "days": 3, "meal": "warm"},  # 原木のシイタケを干す(2026-11-26)。だしにして温まる
 	"onigiri": {"name": "おにぎり", "input": "rice", "amount": 1, "output": 4, "unit": "個", "days": 1, "meal": "strength"},  # 田んぼの米を炊いて握る(2026-11-15)
 }
 
@@ -78,6 +79,7 @@ var garden: Garden  # GameWorld が設定する(野菜の持ち物は Garden に
 var cabin: Cabin    # GameWorld が設定する(丸太の持ち物は Cabin にある)
 var bees: Bees      # GameWorld が設定する(はちみつの持ち物は Bees にある)
 var mill = null     # GameWorld が設定する(粉の持ち物は Mill にある)
+var shiitake = null # GameWorld が設定する(シイタケの持ち物は Shiitake にある。2026-11-26)
 
 # 鍋の中身 {recipe, start_day: int}。空なら {}。[0] = 母屋のストーブ、[1] = 増築した部屋のかまど(2026-11-11)
 var pots := [{}, {}]
@@ -113,6 +115,8 @@ func _commit() -> void:
 func _pile(input: String) -> Dictionary:
 	if input == "honey":
 		return bees.stock
+	if input == "shiitake":
+		return shiitake.stock
 	if input.begins_with("flour_"):
 		return mill.flour
 	return forest.produce if forest.produce.has(input) else garden.produce
@@ -125,6 +129,10 @@ static func from_grain(id: String) -> bool:
 	var input: String = RECIPES[id].input
 	return input.begins_with("flour_") or bool(Garden.CROPS.get(input, {}).get("grain", false))
 
+# 材料がシイタケか(画面のページ分け用。野菜と果物のページは 15 行いっぱいなので、穀物と粉のページに入れる。2026-11-26)
+static func from_mushroom(id: String) -> bool:
+	return RECIPES[id].input == "shiitake"
+
 # 材料が果物かはちみつか(画面のページ分け用。違えば野菜)
 static func from_tree(id: String) -> bool:
 	var input: String = RECIPES[id].input
@@ -135,6 +143,8 @@ func grows_here(id: String) -> bool:
 	var input: String = RECIPES[id].input
 	if input == "honey":
 		return true
+	if input == "shiitake":  # 原木にするコナラかクヌギが育つ土地
+		return Cabin.OAK_SPECIES.any(func(sp): return forest.grows_here(sp))
 	return forest.grows_here(input) if Forest.FRUITS.has(input) else garden.grows_here(_key(input))
 
 func input_count(id: String) -> int:

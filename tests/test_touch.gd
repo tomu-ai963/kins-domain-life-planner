@@ -278,7 +278,7 @@ func _test_menu() -> void:
 	_check(tc.menu_open and _pad("plant").is_empty(), "メニューを開くと、いつものボタンは隠れる")
 	for p in tc.pads(_view()):
 		ids.append(p.id)
-	_check(ids.size() == 26, "メニューに 25 の操作と閉じるボタンがある(%d)" % ids.size())
+	_check(ids.size() == 27, "メニューに 26 の操作と閉じるボタンがある(%d)" % ids.size())
 	_check(not ("year1" in ids) and "more" in ids and "text" in ids, "未来のプレビューは「その他」の中。文字を隠すボタンがある(レビュー M4・G10)")
 	_check("family" in ids, "メニューに「家族」(名前を付け直す)がある")
 	_check(not tc.touch(0, Vector2(100, 100), true) and tc.stick_value() == Vector2.ZERO, "メニューのあいだは歩かない")

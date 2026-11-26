@@ -474,6 +474,9 @@ func _status_lines() -> PackedStringArray:
 	var memorial: String = _main.memorial_line()
 	if memorial != "":
 		lines.append(memorial)
+	var hodagi: String = _main.shiitake_line()
+	if hodagi != "":
+		lines.append(hodagi)
 	if touch_mode:
 		lines.append("持ち物と操作はメニューから")
 	else:
@@ -508,7 +511,7 @@ func _here_line() -> String:
 	if _main.world.market.is_near(_main.player_pos()) and not is_shop_open():
 		market = "市場の前(B で開く)"
 	for line in [_main.people_line(), _main.furniture_line(), market, _main.plot_line(), _main.mill_line(),
-			_main.pond_beside_line(), _main.feeder_line(), _main.nest_box_line(), _main.prune_line(),
+			_main.pond_beside_line(), _main.feeder_line(), _main.shiitake_line(), _main.nest_box_line(), _main.prune_line(),
 			_main.memorial_line()]:
 		if line != "":
 			return line
@@ -594,7 +597,7 @@ func _touch_help_lines() -> PackedStringArray:
 		"植える: 木を植える/区画にまく  水やり  収穫  抜く: 抜く/伐る",
 		"小屋: 場所を決める/作業/苗づくり  使う: 家具のそばで使う",
 		"市場・話す・雪かき: 使えるときだけボタンが出る(市場は南の境界の外)",
-		"メニュー: 菜園 池 井戸 石臼 巣箱 餌台 剪定 名前(自分と家族。木のそばなら記念樹)",
+		"メニュー: 菜園 池 井戸 石臼 巣箱 餌台 剪定 原木 名前(自分と家族。木のそばなら記念樹)",
 		"メニュー: 植える木と野菜を選ぶ  種/苗木  持ち物  音量  文字(隠して景色を眺める)",
 		"メニュー > その他: +1年 +10年 +1時間 今に戻す(未来をプレビュー)",
 	])
@@ -610,7 +613,7 @@ func _help_lines() -> PackedStringArray:
 		"[1]%s [2]果樹(押すたびに %s) [3]%s [V]種/苗木" % [_main.group_keys_text("broadleaf"), _main.group_keys_text("fruit", false), _main.group_keys_text("conifer")],
 		_main.crop_keys_text(),
 		"SPACE:植える/区画にまく  Q:水やり/井戸・池・川で汲む  E:収穫/草取り/わら  Z:抜く/伐る(斧は1日3本)",
-		"O:石臼を置く/穀物を挽く  I:井戸を掘る",
+		"O:石臼を置く/穀物を挽く  I:井戸を掘る  0:コナラ・クヌギの丸太を林の日陰に置いてシイタケを育てる(種駒は市場)",
 		"F:菜園  P:池  H:小屋(完成したら 苗づくり / ストーブの前で料理 / ベッドのそばで日記。小屋ができるまではテントの寝袋で日記)  K:ヒントを閉じる",
 		"T:+1年  G:+10年  N:+1時間  R:今に戻す(未来をプレビュー)  F2:文字を隠す/出す(景色を眺める)",
 	])

@@ -48,6 +48,7 @@ func _process(_delta: float) -> bool:
 			_test_toon()
 			_test_winter_work()
 			_test_nest_box_view()
+			_test_shiitake_view()
 			_test_snow_view()
 			_test_winter_sights()
 		10:
@@ -1389,6 +1390,73 @@ func _test_hive_view() -> void:
 	_check(view.get_child(0).get_node("HiveBody") is StaticBody3D, "巣箱に当たり判定がある")
 
 const NEST_TREE := Vector2(-40, 40)  # ほかのテストの物から離れた場所
+const HODAGI_TREE := Vector2(-40, 20)  # 原木シイタケのテストの日陰の木(ほかのテストの物から離れた場所)
+
+# 原木シイタケ(2026-11-26): 0 で日陰に置く・左上の行と札・3D の形・E で採る・日記・タッチの言い換え
+func _test_shiitake_view() -> void:
+	print("原木シイタケ")
+	var w = main.world
+	var hud = main.get_node("HUD")
+	var player: CharacterBody3D = main.get_node("Player")
+	var view = main.get_node("Hodagi")
+	var s = w.shiitake
+	var c = w.cabin
+	var keep := [int(c.materials.log), c.own_logs, c.oak_logs, s.spawn, int(s.stock.shiitake)]
+	_check(w.forest.nearest_index(HODAGI_TREE, 4.0, "") < 0 and s.logs.is_empty(), "テストの場所のまわりに木もほだ木もない")
+	w.forest.trees.append({"pos": HODAGI_TREE, "species": "konara", "form": "sapling", "planted_at": w.forest._now(), "start_age": 20.0, "sprouts": true, "last_harvest": "", "last_watered": "", "bonus_years": 0.0, "pruned_year": 0, "id": 9001})
+	w.forest.changed.emit()
+	var under := HODAGI_TREE + Vector2(1.2, 0)
+	player.global_position = Vector3(under.x, 0, under.y)
+	c.materials.log = 0
+	c.own_logs = 0
+	c.oak_logs = 0
+	s.spawn = 0
+	_check(main.shiitake_line() == "", "原木にできる丸太がなければ、日陰でも何も出ない")
+	c.materials.log = 1
+	c.own_logs = 1
+	c.oak_logs = 1
+	_check(main.shiitake_line().contains("種駒を買うと、0 で"), "丸太があって種駒がなければ、市場で買うよう出る: " + main.shiitake_line())
+	_press(KEY_0)
+	_check(s.logs.is_empty() and hud._message.contains("種駒がない"), "種駒がなければ置けない")
+	s.spawn = 1
+	_check(main.shiitake_line() == "日陰: 0 で原木を置ける(コナラ・クヌギの丸太 1本・種駒 1袋)", "日陰で置けることが出る: " + main.shiitake_line())
+	_check(main.near_action() == [KEY_0, "原木を置く"] and hud.action_text() == "0 原木を置く", "体のそばの札")
+	hud.touch_mode = true
+	_check(hud._shown(hud._here_line()) == "日陰: メニューの「原木」で原木を置ける(コナラ・クヌギの丸太 1本・種駒 1袋)", "タッチでは 0 がボタンの名前になる: " + hud._shown(hud._here_line()))
+	hud.touch_mode = false
+	_press(KEY_0)
+	_check(s.logs.size() == 1 and c.oak_log_count() == 0 and s.spawn == 0 and hud._message.contains("種駒を打ち込んで"), "0 で日陰に置く: " + hud._message.left(40))
+	_check(view.get_child_count() == 1 and view.get_child(0).get_child_count() >= 3, "ほだ木の形が出る(枕木・丸太・種駒)")
+	var pieces: int = view.get_child(0).get_child_count()
+	_check(main.shiitake_line().begins_with("ほだ木: 菌が回るまで、あと %d日" % s.SPAWN_DAYS), "菌が回るまでの日数が出る: " + main.shiitake_line())
+	_press(KEY_E)
+	_check(hud._message.contains("菌が回るまで"), "生える前に E を押すと様子が出る")
+	# 生えたら採る
+	var l: Dictionary = s.logs[0]
+	l.placed_day = int(l.placed_day) - s.SPAWN_DAYS
+	l.caps = 9
+	s.changed.emit()
+	_check(view.get_child(0).get_child_count() == pieces + view.CAP_SHOWN_MAX * 2, "生えたシイタケが見える(9 個のうち %d 個まで。傘とひだ)" % view.CAP_SHOWN_MAX)
+	_check(main.shiitake_line() == "ほだ木: シイタケが 9個生えている(E で採る)" and main.near_action() == [KEY_E, "シイタケ"], "採れることが出る")
+	_check(main.kitchen_panel.diary_text().contains("シイタケが生えているほだ木が 1本ある"), "日記の「今日」に出る")
+	_press(KEY_E)
+	_check(int(s.stock.shiitake) == keep[4] + 9 and l.caps == 0 and hud._message.contains("シイタケを9個採った(このほだ木から、あと 5回採れる)"), "E で採る: " + hud._message.left(50))
+	_check(main.produce_line().contains("シイタケ"), "持ち物の収穫物に出る")
+	_check(main.shop_rows().size() >= 0 and main.market_panel.good_name(w.market.good("shiitake_spawn")).begins_with("シイタケの種駒"), "市場の品の名前")
+	_check(main.shiitake_line().contains("雨の翌日に生えやすい") or main.shiitake_line().contains("春と秋に生える"), "採ったあとの様子: " + main.shiitake_line())
+	# ほだ木の上には木を植えられない
+	_check(w.tree_spot_problem(l.pos) == "hodagi", "ほだ木の上には植えられない")
+	# 片付け
+	s.logs.clear()
+	s.changed.emit()
+	w.forest.trees = w.forest.trees.filter(func(t): return t.pos != HODAGI_TREE)
+	w.forest.changed.emit()
+	c.materials.log = keep[0]
+	c.own_logs = keep[1]
+	c.oak_logs = keep[2]
+	s.spawn = keep[3]
+	s.stock.shiitake = keep[4]
+	_check(view.get_child_count() == 0, "ほだ木がなくなると見えなくなる")
 
 # ムクドリの巣箱: L で作る・HUD の行・作っている形と掛けた形・ムクドリの姿
 func _test_nest_box_view() -> void:

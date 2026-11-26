@@ -14,6 +14,8 @@ signal dirty    # セーブに入る状態が変わった
 # 2026-11-18 とむ決定: 家族と暮らせるよう、最初から 6m × 4m(24m²)。はじめは 4m × 3m だった。
 # 西側が寝る場所(南西に自分と配偶者の大きいベッド、北の壁際に子どものベッド。子どものベッドは logic/Family.gd)、
 # 東側がストーブ(北東)とテーブル(南東)
+const OAK_SPECIES := ["konara", "kunugi"]  # シイタケの原木になる木(logic/Shiitake.gd の LOG_SPECIES と同じ)
+
 const WIDTH := 6.0   # 東西の幅(m)
 const DEPTH := 4.0   # 南北の奥行き(m)
 const LAYOUT := 2    # セーブに書く間取りの版。1(記録なし)= 4m × 3m のころに場所を決めた小屋
@@ -83,6 +85,7 @@ var days_done := 0       # いまの段階で作業した日数
 var last_worked := ""    # 最後に作業した日(YYYY-MM-DD)
 var materials := {"log": 0}  # 丸太の本数(市場の GOODS から買い足せるよう Dictionary にする)
 var own_logs := 0            # そのうち、自分の木を伐った丸太の本数(巣箱に使う)。小屋や薪には市場の丸太を先に使う
+var oak_logs := 0            # そのうち、コナラ・クヌギの丸太の本数(シイタケの原木に使う。2026-11-26)。巣箱にはほかの木の丸太を先に使う
 var ext_stage := -1          # 増築の段階。-1 = 頼んでいない / 0〜2 = 建てている / 3 = できた
 var ext_days_done := 0       # 増築のいまの段階で作業した日数
 var ext_last_worked := ""    # 増築の作業をした最後の日
@@ -107,14 +110,26 @@ func is_complete() -> bool:
 func own_log_count() -> int:
 	return mini(own_logs, int(materials.log))
 
-# 自分の木の丸太を使う(巣箱)
+# 自分の木の丸太を使う(巣箱)。コナラ・クヌギの丸太はあとに残す
 func spend_own_logs(n: int) -> void:
 	own_logs = own_log_count() - n
 	materials.log = int(materials.log) - n
+	oak_logs = oak_log_count()
 
 # 丸太全体が減ったあとに呼ぶ(市場の丸太から先に使ったことにする)
 func clamp_own_logs() -> void:
 	own_logs = own_log_count()
+	oak_logs = oak_log_count()
+
+# コナラ・クヌギの丸太の本数(自分の木の丸太より多くはならない)
+func oak_log_count() -> int:
+	return mini(oak_logs, own_log_count())
+
+# コナラ・クヌギの丸太を使う(シイタケの原木)
+func spend_oak_logs(n: int) -> void:
+	oak_logs = oak_log_count() - n
+	own_logs = own_log_count() - n
+	materials.log = int(materials.log) - n
 
 # 壁まで建っているか(当たり判定を付ける)
 func has_walls() -> bool:
@@ -380,13 +395,15 @@ func fell(pos: Vector2, max_dist: float) -> int:
 	var n: int = forest.wood_yield(forest.trees[i])
 	materials.log += n
 	own_logs += n
+	if str(forest.trees[i].species) in OAK_SPECIES:
+		oak_logs += n
 	forest.remove_nearest(pos, max_dist)  # ここで保存される
 	changed.emit()
 	return n
 
 # ── セーブ用(ファイルの読み書きは GameWorld) ───────────────────────
 func to_save() -> Dictionary:
-	var d := {"layout": LAYOUT, "stage": stage, "days_done": days_done, "last_worked": last_worked, "logs": materials.log, "own_logs": own_logs,
+	var d := {"layout": LAYOUT, "stage": stage, "days_done": days_done, "last_worked": last_worked, "logs": materials.log, "own_logs": own_logs, "oak_logs": oak_logs,
 		"ext_stage": ext_stage, "ext_days_done": ext_days_done, "ext_last_worked": ext_last_worked, "furniture": furniture}
 	if site != null:
 		d["site"] = [site.x, site.y]
@@ -401,6 +418,7 @@ func from_save(d: Dictionary) -> void:
 	last_worked = SaveRead.text(d, "last_worked")
 	materials = {"log": SaveRead.count(d, "logs")}
 	own_logs = SaveRead.count(d, "own_logs")  # 記録がないセーブの丸太は、どこから来たか分からないので自分の木に数えない
+	oak_logs = SaveRead.count(d, "oak_logs")  # 記録がないセーブ(2026-11-26 より前)の丸太は、何の木か分からないので原木に数えない
 	# 増築と家具の記録がないセーブ(2026-11-11 より前)は、増築なし・家具なし
 	ext_stage = clampi(SaveRead.whole(d, "ext_stage", -1), -1, EXT_STAGES.size())
 	ext_days_done = SaveRead.count(d, "ext_days_done")

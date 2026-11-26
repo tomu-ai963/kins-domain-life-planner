@@ -24,12 +24,12 @@ const BUY_PAGES := [
 	{"name": "実もの野菜の種と苗", "forms": ["crop_seed"], "groups": ["fruit"]},
 	{"name": "葉ものと香味野菜の種", "forms": ["crop_seed"], "groups": ["leaf", "aroma"]},
 	{"name": "豆と穀物の種", "forms": ["crop_seed"], "groups": ["bean"]},  # 穀物を足して 1 列 15 行を超えるため分けた(2026-11-14)
-	{"name": "丸太", "forms": ["material"]},
+	{"name": "丸太と種駒", "forms": ["material", "spawn"]},  # シイタケの種駒(2026-11-26)。道具と燃料は 15 行あるのでこちらへ
 	{"name": "小屋", "forms": ["extension", "furniture"]},
 	{"name": "道具と燃料", "forms": ["tool", "fuel", "straw"]},
 ]
 # 売る列のページ。果物ははちみつも、実もの野菜は苗も。野菜の組は SELL_GROUPS(果樹と野菜が増えて 1 列 15 行を超えるため分けた)
-const SELL_PAGES := ["果物", "根菜といも", "実もの野菜と苗", "葉もの・香味野菜", "豆と穀物と粉", "果物とはちみつの保存食", "野菜の保存食", "穀物と粉の料理", "自然の木の種 1", "自然の木の種 2"]
+const SELL_PAGES := ["果物", "根菜といも", "実もの野菜と苗", "葉もの・香味野菜", "豆と穀物と粉", "果物とはちみつの保存食", "野菜の保存食", "穀物と粉・きのこの料理", "自然の木の種 1", "自然の木の種 2"]
 const WILD_SEEDS_PER_PAGE := 10  # 自然の木の種の売る列は 10 種類ずつ(ほかの土地の種を持つこともあるので)
 const SELL_GROUPS := {"root": 1, "imo": 1, "fruit": 2, "leaf": 3, "bean": 4, "aroma": 3}
 var _buy_page := 0           # 市場の買う列の今のページ(閉じても覚えておく)
@@ -52,6 +52,8 @@ func good_name(g: Dictionary) -> String:
 		return "丸太(%d本)" % g.amount
 	if g.form == "straw":
 		return "わら(%d束・敷くと雑草が生えない・持っている %d束)" % [g.amount, world.garden.straw]
+	if g.form == "spawn":
+		return "シイタケの種駒(原木1本ぶん・持っている %d袋)" % world.shiitake.spawn
 	if g.species == "tomato":
 		return "%s(小屋で苗にする)" % world.garden.CROPS.tomato.seed_name
 	if g.form == "crop_seed":
@@ -112,12 +114,12 @@ func _sell_page_of(item: String) -> int:
 		var seeds: Array = world.market.SELL_PRICES.keys().filter(func(k): return k.begins_with("seed_"))
 		return SELL_PAGES.find("自然の木の種 1") + mini(1, int(seeds.find(item) / float(WILD_SEEDS_PER_PAGE)))
 	if world.kitchen.RECIPES.has(item):
-		if world.kitchen.from_grain(item):
-			return SELL_PAGES.find("穀物と粉の料理")
+		if world.kitchen.from_grain(item) or world.kitchen.from_mushroom(item):
+			return SELL_PAGES.find("穀物と粉・きのこの料理")
 		return SELL_PAGES.find("果物とはちみつの保存食" if world.kitchen.from_tree(item) else "野菜の保存食")
 	if item.begins_with("flour_"):
 		return SELL_PAGES.find("豆と穀物と粉")
-	if world.forest.FRUITS.has(item) or item == "honey":
+	if world.forest.FRUITS.has(item) or item == "honey" or item == "shiitake":
 		return 0
 	return SELL_GROUPS[world.garden.CROPS[item.trim_prefix("seedling_")].group]
 
@@ -165,6 +167,8 @@ func _market_action(id: String) -> void:
 			hud.show_message("%sを買って、増築した部屋に置いた(-%d₽)" % [main.FURNITURE_NAMES[g.species], g.price], 5.0)
 		elif bought and g.form == "tool":
 			hud.show_message("%sを買った(-%d₽)。%s" % [main.TOOL_NAMES[g.species], g.price, Msg.TOOL_BOUGHT[g.species]], 6.0)
+		elif bought and g.form == "spawn":
+			hud.show_message("シイタケの種駒を1袋買った(-%d₽・持っている %d袋)。自分で伐ったコナラかクヌギの丸太を持って、育った木の枝の下で 0 を押すと、原木に打ち込んで置ける" % [g.price, world.shiitake.spawn], 7.0)
 		elif bought and g.form == "fuel":
 			hud.show_message("ガソリンを%s買った(-%d₽。持っている %s)" % [main.gas_text(int(g.amount)), g.price, main.gas_text(world.tools.gas)])
 		elif bought:

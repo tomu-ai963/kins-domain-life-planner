@@ -34,6 +34,7 @@ const River = preload("res://logic/River.gd")
 const Family = preload("res://logic/Family.gd")
 const Profile = preload("res://logic/Profile.gd")
 const Memorials = preload("res://logic/Memorials.gd")
+const Shiitake = preload("res://logic/Shiitake.gd")
 
 const SAVE_PATH := "user://kins_domain_save.json"
 # セーブの版(2026-11-11 から書く。レビュー S4)。セーブの形を変える変更(名前・単位を変える、意味を変える)をしたら 1 上げ、
@@ -77,6 +78,7 @@ var river := River.new()         # 土地の外の川(2026-11-15。県を選ん�
 var family := Family.new()       # 家族(2026-11-16。はじめに 1 度だけ選ぶ)
 var profile := Profile.new()     # 自分の名前と性別(2026-11-16。いちばんはじめに 1 度だけ決める)
 var memorials := Memorials.new() # 記念樹と歳時記(2026-11-23)
+var shiitake := Shiitake.new()   # 原木シイタケ(2026-11-26)
 var last_pumped := [0, 0]        # 直前にポンプでまとめて水をやった [区画の数, 木の数](文言用・保存しない)
 var is_new_game := false         # 読み込むセーブがなかった(新しく始めた)。県を選んだときに、その土地のはじめの種を配る
 var sound_level := 3             # 音量の段階(0 = 消す、3 = いちばん大きい)。見た目の設定で、ルールには使わない
@@ -213,6 +215,12 @@ func _init() -> void:
 	memorials.dirty.connect(save_game)
 	memorials.forest = forest
 	forest.tree_removed.connect(memorials.on_tree_removed)
+	shiitake.forest = forest
+	shiitake.cabin = cabin
+	shiitake.is_blocked = hodagi_spot_problem
+	kitchen.shiitake = shiitake
+	market.shiitake = shiitake
+	shiitake.dirty.connect(save_game)
 
 # 区画(中心 c)を田んぼにできるか: 川か、掘り終えた池から水が引ける範囲(ポンプで水が届く 20m)
 func _paddy_ok(c: Vector2) -> bool:
@@ -222,12 +230,14 @@ func _paddy_ok(c: Vector2) -> bool:
 
 # 巣箱・餌台・井戸を置く場所に、ほかの物(餌台・井戸・石臼・家族のテント)がかかるか(Bees.is_blocked から呼ぶ)
 func _taken_nearby(pos: Vector2, radius: float) -> bool:
+	if shiitake.covers(pos, radius):  # シイタケのほだ木(2026-11-26)
+		return true
 	return feeders.covers(pos, radius) or well.covers(pos, radius) or mill.covers(pos, radius) or family.covers(pos, radius)
 
 # ── ここに置けるか(レビュー C3。前は Main にあり、ロジックのテストで守られていなかった) ──────────
 # 木を植えられない理由。"" なら植えられる(区画の上は野菜をまくので、呼ぶ側で先に分ける)
-# outside(土地の外) / cabin / hive / feeder / well / mill / tent / yard(小屋の東の庭)
-func tree_spot_problem(pos: Vector2) -> String:
+# outside(土地の外) / cabin / hive / feeder / well / mill / tent / yard(小屋の東の庭) / hodagi(シイタケのほだ木)
+func tree_spot_problem(pos: Vector2, with_hodagi := true) -> String:
 	if forest.is_outside_land(pos):
 		return "outside"  # 外の林では種を拾うだけ(2026-11-16 とむ)
 	if cabin.covers(pos):
@@ -245,7 +255,20 @@ func tree_spot_problem(pos: Vector2) -> String:
 		return "tent"
 	if cabin.in_yard(pos):
 		return "yard"
+	if with_hodagi and shiitake.covers(pos, shiitake.TRUNK_GAP):
+		return "hodagi"
 	return ""
+
+# シイタケのほだ木を置けない理由(Shiitake.spot_problem から呼ぶ。日陰かどうかは Shiitake が見る)。"" なら置ける
+# outside / plot / pond / 木を植えられない理由(cabin / hive / feeder / well / mill / tent / yard)
+func hodagi_spot_problem(pos: Vector2) -> String:
+	if forest.is_outside_land(pos):
+		return "outside"
+	if land.plot_at(pos) != null:
+		return "plot"
+	if land.pond != null and pos.distance_to(land.pond) < land.POND_RADIUS + bees.CLEARANCE:
+		return "pond"
+	return tree_spot_problem(pos, false)
 
 # 長方形 rect(小屋・増築)に、巣箱・餌台・井戸・石臼がかかるか。"" ならかからない / hive / feeder / well / mill
 func rect_problem(rect: Rect2) -> String:
@@ -258,6 +281,8 @@ func rect_problem(rect: Rect2) -> String:
 		return "well"
 	if mill.is_placed() and r.grow(mill.RADIUS).has_point(mill.site):
 		return "mill"
+	if shiitake.logs.any(func(l): return r.has_point(l.pos)):
+		return "hodagi"
 	return ""
 
 # 足元 pos に小屋を建てはじめられない理由(巣箱・餌台・井戸・石臼がかかる)。"" なら Cabin.place に任せる
@@ -306,6 +331,8 @@ func toggle_plot(pos: Vector2) -> String:
 		return "mill"
 	if land.plot_at(pos) == null and family.blocks_plot(land.plot_center(pos), land.PLOT_SIZE * 0.5):
 		return "tent"
+	if land.plot_at(pos) == null and shiitake.blocks_plot(land.plot_center(pos), land.PLOT_SIZE * 0.5):
+		return "hodagi"
 	return garden.toggle_plot(pos)
 
 # X: 足元の果樹を剪定する。切った枝は薪になる。結果は Forest.prune_nearest
@@ -332,6 +359,8 @@ func pond_action(pos: Vector2) -> String:
 		return "mill"
 	if family.covers(pos, land.POND_RADIUS + bees.CLEARANCE):
 		return "tent"
+	if shiitake.covers(pos, land.POND_RADIUS + bees.CLEARANCE):
+		return "hodagi"
 	return land.toggle_pond(pos)
 
 # ── 水と道具(2026-11-14) ────────────────────────────────────
@@ -480,6 +509,7 @@ func check_new_day() -> String:
 	pond.catch_up()
 	bees.catch_up()
 	snow.catch_up()
+	shiitake.catch_up()  # 原木シイタケ: 雨の翌日は生えやすい
 	market.deliver_orders()  # 冬が終わっていれば、注文した春の種が届く
 	family.ensure_tent()   # 小屋が完成していればテントを片付ける
 	family.help_today()    # 家族の朝の手伝い(雨の日は水やりが要らない)
@@ -559,6 +589,7 @@ func save_game() -> void:
 	data["family"] = family.to_save()
 	data["profile"] = profile.to_save()
 	data["memorials"] = memorials.to_save()
+	data["shiitake"] = shiitake.to_save()
 	var ok := _write_save(JSON.stringify(data))
 	if not ok and not _save_failing:
 		save_failed.emit("保存できなかった(%s)。空き容量やフォルダの書き込みを確かめてほしい。直るまで、閉じると今日の分が残らないかもしれない" % ProjectSettings.globalize_path(save_path).get_base_dir())
@@ -711,6 +742,7 @@ func load_game() -> void:
 	family.from_save(SaveRead.dict(data.get("family")))  # 家族の記録がないセーブ(2026-11-16 より前)は、開いたときに一度だけ選ぶ
 	family.ensure_tent()
 	memorials.from_save(SaveRead.dict(data.get("memorials")), family.dined_day >= 0)  # 記念樹の記録がないセーブ(2026-11-23 より前)は、記念樹なしから
+	shiitake.from_save(SaveRead.dict(data.get("shiitake")))  # 原木シイタケの記録がないセーブ(2026-11-26 より前)は、ほだ木なしから
 
 # 今のセーブを「名前.infix日付_時刻.json」として写して残す。残した名前を返す
 func _keep_copy(infix: String) -> String:

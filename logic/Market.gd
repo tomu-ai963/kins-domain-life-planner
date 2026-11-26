@@ -105,6 +105,7 @@ const GOODS := [
 	{"id": "mill", "species": "mill", "form": "tool", "amount": 1, "price": 8000},
 	# 畑を守る(2026-11-15。値段は仮の数字)。わら 5 束(1 束で 1 区画に敷ける)。穀物を収穫しても取れる
 	{"id": "straw", "species": "straw", "form": "straw", "amount": 5, "price": 150},
+	{"id": "shiitake_spawn", "species": "shiitake_spawn", "form": "spawn", "amount": 1, "price": 300},  # シイタケの種駒 1 袋(原木 1 本ぶん。2026-11-26。仮の数字)
 ]
 # 買い取り値(リンゴは 1 個あたり、野菜は 1kg あたりの ₽)。店頭の値段の半分くらい
 # seedling_ は小屋で育てた苗(1 鉢 = 1 区画ぶん)の買い取り値。
@@ -129,6 +130,7 @@ const SELL_PRICES := {
 	# 穀物と粉の料理。材料を売るよりおよそ 2 倍(今までと同じ置き方)
 	"rye_bread": 70, "bliny": 20, "udon": 40, "soba_noodle": 68, "kibi_dango": 24, "kasha": 45,
 	"onigiri": 25,  # 米 1kg → 4 個。材料を売るよりおよそ 2 倍
+	"shiitake": 25, "hoshi_shiitake": 250,  # 生のシイタケは 1 個、干し椎茸は 1 袋(10 個 → 2 袋。材料を売るより 2 倍)。2026-11-26 の仮の数字
 	# 自然の木の種(seed_ + 樹種。1 粒あたり。2026-11-11 とむ決定: 売れるが買えない)。外の林で年に数日しか拾えないので、市場の種より少し高い
 	"seed_buna": 15, "seed_mizunara": 8, "seed_harunire": 4, "seed_nanakamado": 6, "seed_oyamazakura": 8, "seed_yamazakura": 8,
 	"seed_akashide": 4, "seed_mizuki": 5, "seed_enoki": 5, "seed_hannoki": 3, "seed_egonoki": 5, "seed_tsuge": 10,
@@ -154,6 +156,7 @@ var bees: Bees        # GameWorld が設定する(はちみつの持ち物は Be
 var rect_problem: Callable  # GameWorld が設定する(長方形に巣箱・餌台・井戸・石臼がかかるか。GameWorld.rect_problem)
 var tools = null      # GameWorld が設定する(道具とガソリンの持ち物は Tools にある)
 var mill = null       # GameWorld が設定する(粉の持ち物は Mill にある)
+var shiitake = null   # GameWorld が設定する(種駒とシイタケの持ち物は Shiitake にある。2026-11-26)
 
 func is_near(pos: Vector2) -> bool:
 	return pos.distance_to(POS) <= REACH
@@ -170,6 +173,8 @@ func sells(g: Dictionary) -> bool:
 		return forest.grows_here(g.species)
 	if g.form == "crop_seed":
 		return garden.grows_here(g.species)
+	if g.form == "spawn":  # 種駒は、原木にするコナラかクヌギが育つ土地だけ
+		return Cabin.OAK_SPECIES.any(func(sp): return forest.grows_here(sp))
 	return true
 
 # 1 つ買う。結果: bought / no_money / unknown(並んでいない品も)。
@@ -200,6 +205,11 @@ func buy(id: String) -> String:
 		return "bought"
 	if g.form == "straw":
 		garden.straw += int(g.amount)
+		changed.emit()
+		return "bought"
+	if g.form == "spawn":
+		shiitake.spawn += int(g.amount)
+		shiitake.dirty.emit()
 		changed.emit()
 		return "bought"
 	var stock: Dictionary = forest.seeds
@@ -309,6 +319,8 @@ func pile_of(item: String) -> Dictionary:
 		return kitchen.stock
 	if item == "honey":
 		return bees.stock
+	if item == "shiitake":
+		return shiitake.stock
 	if item.begins_with("flour_"):
 		return mill.flour
 	return garden.produce if garden.produce.has(item) else forest.produce

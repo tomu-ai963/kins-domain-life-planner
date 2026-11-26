@@ -9,6 +9,7 @@ const WildWoodsView = preload("res://view/3d/WildWoodsView3D.gd")
 const RiverView = preload("res://view/3d/RiverView3D.gd")
 const WellView = preload("res://view/3d/WellView3D.gd")
 const MillView = preload("res://view/3d/MillView3D.gd")
+const ShiitakeView = preload("res://view/3d/ShiitakeView3D.gd")
 const FamilyView = preload("res://view/3d/FamilyView3D.gd")
 const Msg = preload("res://view/main/Messages.gd")
 const VisitorTalk = preload("res://view/main/VisitorTalk.gd")
@@ -16,6 +17,7 @@ const FamilyTalk = preload("res://view/main/FamilyTalk.gd")
 const KitchenPanel = preload("res://view/main/KitchenPanel.gd")
 const MarketPanel = preload("res://view/main/MarketPanel.gd")
 const TreeMemorials = preload("res://view/main/TreeMemorials.gd")
+const ShiitakeWork = preload("res://view/main/ShiitakeWork.gd")
 const REACH := 2.0    # 足元 2m 以内
 const PICKUP_RADIUS := 1.2  # 落ちている種は、これだけ近づくと拾う
 const FELL_CONFIRM_SECONDS := 4.0  # 根付いた木は、この時間内にもう一度 Z を押すと伐れる
@@ -59,6 +61,7 @@ var family_talk := FamilyTalk.new(self)
 var kitchen_panel := KitchenPanel.new(self)
 var market_panel := MarketPanel.new(self)
 var tree_memorials := TreeMemorials.new(self)
+var shiitake_work := ShiitakeWork.new(self)  # 原木シイタケ(2026-11-26)
 
 func _ready() -> void:
 	# 本物のセーブのときだけ控えを取る(テストや確認用のセーブでは取らない)
@@ -210,6 +213,10 @@ func _setup_3d_only() -> void:
 	mill_view.name = "Mill"
 	add_child(mill_view)
 	mill_view.setup(world.mill, world.tools)
+	var hodagi_view := ShiitakeView.new()  # 原木シイタケのほだ木(2026-11-26)
+	hodagi_view.name = "Hodagi"
+	add_child(hodagi_view)
+	hodagi_view.setup(world.shiitake)
 	$Cabin.set_kitchen(world.kitchen)
 	$Wildlife.setup(world.wildlife, $Player)
 	$Visitor.setup(world.visitors, $Player)
@@ -326,6 +333,7 @@ func _check_new_day() -> void:
 		lines.append("池に%sが来た" % pond.CREATURES[c].name)
 	if world.bees.last_arrivals > 0:
 		lines.append("空の巣箱に蜂が入った(%d箱)" % world.bees.last_arrivals)
+	lines.append_array(shiitake_work.morning_lines())
 	if world.snow.last_fell:
 		lines.append("雪かきの道が雪で埋まった")
 	if not world.market.last_delivered.is_empty():
@@ -592,6 +600,10 @@ func _prune() -> void:
 func memorial_line() -> String:
 	return tree_memorials.memorial_line()
 
+# 左上に出す、ほだ木のそば・原木を置ける日陰の 1 行(中身は shiitake_work)
+func shiitake_line() -> String:
+	return shiitake_work.line()
+
 func prune_line() -> String:
 	var f := world.forest
 	if f.season != "winter" or f.time_offset_years > 0.0:
@@ -653,7 +665,7 @@ func _talk() -> void:
 # HUD に出す、話せる人の 1 行: 訪問者と話せる距離ならその人、家族のそばなら家族、遠くに訪問者が来ていればその案内
 # 体のそばに出す、今ここでできること 1 つ(レビュー G6)。[キー(KEY_E など), 言葉]。なければ []
 # 左上の文字の行(people_line・furniture_line・plot_line など)と同じ判断で、上ほど優先する:
-# 話す → 家具 → 市場 → 足元の区画 → 果樹 → 石臼 → 水場 → 餌台 → ムクドリの巣箱 → 蜂の巣箱 → 剪定
+# 話す → 家具 → 市場 → 足元の区画 → 果樹 → 石臼 → 水場 → 餌台 → ほだ木 → ムクドリの巣箱 → 蜂の巣箱 → 剪定
 func near_action() -> Array:
 	var pos := player_pos()
 	if people_line().ends_with("(C で話す)"):
@@ -694,6 +706,9 @@ func near_action() -> Array:
 		return [KEY_Q, "まとめて水やり"]
 	if feeder_line().contains("L で"):
 		return [KEY_L, "餌を置く"]
+	var hodagi: Array = shiitake_work.near_action()  # ほだ木は育った木の下に置くので、巣箱の案内より先に出す
+	if not hodagi.is_empty():
+		return hodagi
 	if nest_box_line().contains("L で"):
 		return [KEY_L, "巣箱を作る"]
 	var hive := hive_line()
@@ -1285,6 +1300,8 @@ func produce_name(item: String) -> String:
 		return world.forest.SPECIES[item].name
 	if item == "honey":
 		return "はちみつ"
+	if item == "shiitake":
+		return "シイタケ"
 	if item.begins_with("seedling_"):
 		return world.garden.CROPS[item.trim_prefix("seedling_")].name + "の苗"
 	if world.kitchen.RECIPES.has(item):
@@ -1302,6 +1319,8 @@ func produce_unit(item: String) -> String:
 		return world.forest.FRUITS[item].unit
 	if world.kitchen.RECIPES.has(item):
 		return world.kitchen.RECIPES[item].unit
+	if item == "shiitake":
+		return "個"
 	return "鉢" if item.begins_with("seedling_") else "kg"
 
 func produce_count(item: String) -> int:
@@ -1311,6 +1330,8 @@ func produce_count(item: String) -> int:
 		return int(world.forest.produce[item])
 	if item == "honey":
 		return int(world.bees.stock.honey)
+	if item == "shiitake":
+		return int(world.shiitake.stock.shiitake)
 	if item.begins_with("seedling_"):
 		return int(world.seedlings.ready[item.trim_prefix("seedling_")])
 	if world.kitchen.RECIPES.has(item):
@@ -1556,6 +1577,9 @@ func _harvest() -> void:
 		var tip := "" if g.straw > 0 else "。わらを敷くと生えない(穀物の収穫か市場で)"
 		$HUD.show_message("%sの区画の雑草を抜いた%s。%d日たつとまた生える%s" % [g.CROPS[c.kind].name, lost, g.WEED_FREE_DAYS, tip], 5.0)
 		return
+	# そばのほだ木のシイタケ(2026-11-26。区画の上は野菜が先)
+	if c.is_empty() and shiitake_work.try_harvest(pos):
+		return
 	# 足元 2m 以内の果樹を収穫する
 	var result: String = world.forest.harvest_nearest(pos, REACH)
 	if crop == "growing" and result != "harvested":
@@ -1730,7 +1754,7 @@ func tools_owned_text() -> String:
 		if t.has(m):
 			names.append(MACHINE_NAMES[m])
 	var straw := "  わら %d束" % world.garden.straw if world.garden.straw > 0 else ""
-	return "・".join(names) + "  ガソリン %s(%sまで)" % [gas_text(t.gas), gas_text(t.MAX_GAS)] + straw
+	return "・".join(names) + "  ガソリン %s(%sまで)" % [gas_text(t.gas), gas_text(t.MAX_GAS)] + straw + shiitake_work.stock_text()
 
 # 足元の野菜を抜く。なければ 2m 以内の木を伐る(育った木は丸太になる。種は戻らない。
 # 達成済みのクエストは戻らない)。木もなければ、作業を始める前の小屋・池の場所を取り消す
@@ -1753,6 +1777,7 @@ func _remove() -> void:
 		return
 	var falls: bool = not felled.is_empty() and $Trees.has_method("start_fall") and $Trees.start_fall(felled, pos)
 	var had_box: bool = not felled.is_empty() and not world.nest_boxes.box_on(felled.pos).is_empty()
+	var oak: bool = not felled.is_empty() and str(felled.species) in world.cabin.OAK_SPECIES
 	var logs: int = world.fell(pos, REACH)
 	world.nest_boxes.drop_missing()  # 伐った木に掛けていた巣箱もなくなる
 	var sawed: bool = world.tools.last_machine == "chainsaw"
@@ -1761,7 +1786,8 @@ func _remove() -> void:
 	if falls and $Audio.has_method("play_after"):
 		$Audio.play_after("tree_fall", TREE_FALL_SOUND_DELAY)
 	if logs > 0:
-		$HUD.show_message("木を伐った(丸太 +%d本・%s)%s" % [logs, cutter_text(), "。掛けていたムクドリの巣箱も外れた" if had_box else ""])
+		var hodagi := "。コナラ・クヌギの丸太は、0 で林の日陰に置くとシイタケの原木になる(種駒は市場)" if oak else ""
+		$HUD.show_message("木を伐った(丸太 +%d本・%s)%s%s" % [logs, cutter_text(), "。掛けていたムクドリの巣箱も外れた" if had_box else "", hodagi], 6.0 if oak else 3.0)
 	elif logs == 0:
 		$HUD.show_message("木を抜いた(細くて丸太にはならない)")
 	elif world.cabin.cancel(pos):
@@ -1855,6 +1881,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_well_action()
 		KEY_O:
 			_mill_action()
+		KEY_0:
+			shiitake_work.place()  # 林の日陰に原木を置く(2026-11-26)
 		KEY_Y:
 			tree_memorials.open_names()  # 木のそばなら記念樹、なければ自分と家族の名前
 		KEY_T:

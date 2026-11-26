@@ -17,7 +17,7 @@ var hud: Node:
 const POT_NAMES := ["鍋", "かまどの鍋"]      # 母屋のストーブの鍋 / 増築した部屋のかまどの鍋
 const POT_PLACES := ["ストーブ", "かまど"]
 # ストーブと腰掛けの画面のページ(料理が増えて 1 列 15 行を超えるため分けた。材料が果物かはちみつか、野菜か)
-const COOK_PAGES := ["果物とはちみつ", "野菜", "穀物と粉"]
+const COOK_PAGES := ["果物とはちみつ", "野菜", "穀物と粉・きのこ"]
 var _cook_page := 0          # ストーブと腰掛けの画面の今のページ(COOK_PAGES)
 
 func _init(m: MainScript) -> void:
@@ -194,7 +194,7 @@ func _effects_text() -> String:
 
 # ストーブと腰掛けの料理のページ
 func _cook_page_of(id: String) -> int:
-	if world.kitchen.from_grain(id):
+	if world.kitchen.from_grain(id) or world.kitchen.from_mushroom(id):
 		return 2
 	return 0 if world.kitchen.from_tree(id) else 1
 
@@ -255,6 +255,7 @@ func diary_text() -> String:
 		todo.append("餌台の餌が切れている")
 	if f.season == "winter" and f.prunable_count() > 0:
 		todo.append("剪定できる果樹が %d本 ある" % f.prunable_count())
+	todo.append_array(main.shiitake_work.diary_today())  # 原木シイタケ(2026-11-26)
 	var traces: Array = world.nest_boxes.traces_today()  # 夜の巣箱の跡(2026-11-26)
 	if not traces.is_empty():
 		todo.append("巣箱でムクドリの跡を見つけた(%s)" % "・".join(PackedStringArray(traces)))
@@ -307,6 +308,7 @@ func _tomorrow_lines() -> PackedStringArray:
 			lines.append(line)
 	if world.bees.ready_tomorrow() > 0:
 		lines.append("はちみつが採れる巣箱: %d" % world.bees.ready_tomorrow())
+	lines.append_array(main.shiitake_work.diary_tomorrow())
 	if world.visitors.is_visit_day(world.forest.day_number() + 1):
 		lines.append("%sが来そう" % world.visitors.CAST[world.visitors.who_on(world.forest.day_number() + 1)].name)
 	return lines

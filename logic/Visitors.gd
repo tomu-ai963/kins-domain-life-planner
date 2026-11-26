@@ -52,6 +52,7 @@ const ASK := {
 	# 穀物と粉の料理(2026-11-14)
 	"wheat": 2, "rye": 2, "soba": 1, "kibi": 1, "rice": 2,
 	"rye_bread": 1, "bliny": 3, "udon": 2, "soba_noodle": 1, "kibi_dango": 3, "kasha": 1, "onigiri": 3,
+	"shiitake": 5, "hoshi_shiitake": 1,  # 原木シイタケ(2026-11-26)
 }
 const BEEKEEPER := "fyodor"  # 蜂を分けてくれる人
 const FIREWOOD := "firewood"   # 冬の頼みごとの薪(Kitchen.firewood。市場では売れない)
