@@ -548,10 +548,6 @@ func choose_region(id: String) -> String:
 	save_game()
 	return "chosen"
 
-# 家族を決める(一度だけ。あとから変えられない)。結果は Family.choose。決めたら保存する
-func choose_family(spouse: String, children: int) -> String:
-	return family.choose(spouse, children)
-
 # 自分の名前と性別を決める(一度だけ)。結果は Profile.choose。決めたら保存する
 func choose_profile(player_name: String, sex: String) -> String:
 	return profile.choose(player_name, sex)

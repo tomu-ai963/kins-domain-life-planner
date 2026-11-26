@@ -42,7 +42,7 @@ func tree_info(tree: Dictionary) -> String:
 	return "%s  %s に植えた(%s)" % [_species_name(str(tree.species)), _date(planted), _planted_days(planted)]
 
 # 歳時記の行(日付の順。同じ日は記念樹が先)。「2026/11/23  コナラ「長男の木」 春の朝、みんなで植えた」。なくなった木は日付を足す
-# 暮らしの節目(2026-11-26)も混ぜる: 「2026/11/26  家族ではじめての夕食  ジャム(アリョーナ・ワーニャと)」
+# 暮らしの節目(2026-11-26)も混ぜる: 「2026/11/26  家族ではじめての夕食  ジャム(はな・そらと)」
 func chronicle_lines() -> PackedStringArray:
 	var rows := []  # [日付, 順番, 行]
 	for r in world.memorials.records:

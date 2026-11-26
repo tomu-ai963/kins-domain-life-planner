@@ -26,6 +26,17 @@ func _initialize() -> void:
 	print("RESULT: %d passed, %d failed" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
+# テスト用の家族の名前(ゲームには、はじめの名前・仮の名前はない。2026-11-26 とむ決定)。子どもは上の子から
+const TEST_SPOUSE_NAMES := {"alyona": "アリョーナ", "vera": "ヴェーラ", "ilya": "イリヤ", "mikhail": "ミハイル"}
+const TEST_KIDS := [{"name": "ワーニャ", "sex": "m", "age": 9}, {"name": "マーシャ", "sex": "f", "age": 6}, {"name": "ポーリャ", "sex": "f", "age": 3}, {"name": "よにんめ", "sex": "m", "age": 1}]
+
+# 配偶者と子ども n 人で家族を決める(名前はテスト用の名前)。結果は Family.choose_custom
+func _choose(f, spouse: String, n: int) -> String:
+	var kids := []
+	for i in range(n):
+		kids.append(TEST_KIDS[mini(i, TEST_KIDS.size() - 1)].duplicate())
+	return f.choose_custom(spouse, TEST_SPOUSE_NAMES.get(spouse, "なまえ") if spouse != "" else "", kids)
+
 func _check(cond: bool, label: String) -> void:
 	if cond:
 		_passed += 1
@@ -68,7 +79,7 @@ func _test_tree_spots() -> void:
 	_check(w.tree_spot_problem(Vector2(-10, 20)) == "well", "井戸の近くには植えられない")
 	w.mill.site = Vector2(0, 20)
 	_check(w.tree_spot_problem(Vector2(0, 20)) == "mill", "石臼の近くには植えられない")
-	w.family.choose("alyona", 0)
+	_choose(w.family, "alyona", 0)
 	w.family.tent = Vector2(10, 20)
 	_check(w.family.has_tent() and w.tree_spot_problem(Vector2(10, 20)) == "tent", "テントの近くには植えられない")
 	w.cabin.site = Vector2(30, -20)

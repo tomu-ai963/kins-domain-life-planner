@@ -2,7 +2,8 @@ extends RefCounted
 
 # ── 家族(描画を持たない。2026-11-16) ──────────────────────────────
 # ゲームのはじめ(家族の記録がないセーブを開いたときも)に一度だけ、配偶者と子どもを選ぶ。あとから変えられない。
-# 名前は自分で付けられ(はじめは決まった名前が入っている)、あとからも付け直せる(rename。2026-11-16 とむ決定)。
+# 名前は選ぶときに自分で入れ、あとからも付け直せる(rename。2026-11-16 とむ決定)。
+# はじめの名前・仮の名前は持たない(2026-11-26 とむ決定「最初から記入するだけ、仮の名前も作らない」)。名前が空なら決められない。
 # 子どもは 1 人ずつ、息子か娘かと年齢(0〜MAX_START_AGE 歳)も選ぶ。
 # 家族は最初から土地で暮らす。小屋が完成するまでは、夜はテントで休む(テントの場所はここで決める)。
 # テントには南の入口から歩いて入れる。中には寝袋が並び、自分の寝袋のそばで H を押すと休める(日記。2026-11-16 とむ)。
@@ -30,22 +31,21 @@ const Forest = preload("res://logic/Forest.gd")
 signal changed  # 見た目に関わる状態が変わった
 signal dirty    # セーブに入る状態が変わった
 
-# 選べる配偶者。sex は服と呼び方(妻 / 夫)だけに使う
+# 選べる配偶者。sex は服と呼び方(妻 / 夫)だけに使う。名前は持たず、選ぶ画面では見た目(look。姿は view/3d/FamilyView3D.gd の LOOKS)で見分ける
+# id は前のセーブとの互換のための印(名前ではない)
 const SPOUSES := {
-	"alyona": {"name": "アリョーナ", "sex": "f", "relation": "妻"},
-	"vera": {"name": "ヴェーラ", "sex": "f", "relation": "妻"},
-	"ilya": {"name": "イリヤ", "sex": "m", "relation": "夫"},
-	"mikhail": {"name": "ミハイル", "sex": "m", "relation": "夫"},
+	"alyona": {"look": "赤い頭巾", "sex": "f", "relation": "妻"},
+	"vera": {"look": "三つ編み", "sex": "f", "relation": "妻"},
+	"ilya": {"look": "あごひげ", "sex": "m", "relation": "夫"},
+	"mikhail": {"look": "帽子", "sex": "m", "relation": "夫"},
 }
 const SPOUSE_ORDER := ["alyona", "vera", "ilya", "mikhail"]
-# 子どもの枠。上の子から順にこの並び。id は並びの印(名前を変えても変わらない)。name・sex・age は選ぶ画面のはじめの値
+# 子どもの枠。上の子から順にこの並び。id は並びの印(名前ではない。前のセーブとの互換のため今の id のまま)。sex・age は選ぶ画面のはじめの値
 const CHILDREN := [
-	{"id": "vanya", "name": "ワーニャ", "sex": "m", "relation": "息子", "age": 9},
-	{"id": "masha", "name": "マーシャ", "sex": "f", "relation": "娘", "age": 6},
-	{"id": "polya", "name": "ポーリャ", "sex": "f", "relation": "娘", "age": 3},
+	{"id": "vanya", "sex": "m", "relation": "息子", "age": 9},
+	{"id": "masha", "sex": "f", "relation": "娘", "age": 6},
+	{"id": "polya", "sex": "f", "relation": "娘", "age": 3},
 ]
-# 子どもの名前を空にしたときに使う名前(枠ごと。息子か娘かで変わる)。はじめの値は CHILDREN の名前と同じ
-const DEFAULT_NAMES := {"m": ["ワーニャ", "ペーチャ", "コーリャ"], "f": ["ダーシャ", "マーシャ", "ポーリャ"]}
 const MAX_CHILDREN := 3
 const MAX_START_AGE := 17     # 選べる子どもの年齢の上限
 const NAME_MAX := 8           # 名前の文字数の上限
@@ -119,18 +119,9 @@ func _commit() -> void:
 func day_number() -> int:
 	return forest.day_number()
 
-# 家族を決める(一度だけ)。名前・息子か娘か・年齢は、はじめの値のまま。結果は choose_custom
-func choose(spouse: String, children: int) -> String:
-	if children < 0 or children > MAX_CHILDREN:
-		return "unknown"
-	var kids := []
-	for i in range(children):
-		kids.append({"name": CHILDREN[i].name, "sex": CHILDREN[i].sex, "age": CHILDREN[i].age})
-	return choose_custom(spouse, "", kids)
-
-# 家族を決める(一度だけ)。spouse は SPOUSES の id か ""(いない)。spouse_name が空なら決まった名前。
-# kids は子どもの並び [{name, sex: m/f, age}]。名前が空なら、その枠の決まった名前。
-# 結果: chosen / already / unknown(知らない配偶者・人数・性別・年齢) / too_long(名前が長すぎる)
+# 家族を決める(一度だけ)。spouse は SPOUSES の id か ""(いない)。spouse_name は配偶者の名前(いるときは要る)。
+# kids は子どもの並び [{name, sex: m/f, age}]。名前は 1 人ずつ要る(仮の名前は付けない)。
+# 結果: chosen / already / unknown(知らない配偶者・人数・性別・年齢) / empty(名前がない) / too_long(名前が長すぎる)
 func choose_custom(spouse: String, spouse_name: String, kids: Array) -> String:
 	if chosen:
 		return "already"
@@ -145,29 +136,27 @@ func choose_custom(spouse: String, spouse_name: String, kids: Array) -> String:
 			return "unknown"
 		if int(k.age) < 0 or int(k.age) > MAX_START_AGE:
 			return "unknown"
+		if clean_name(str(k.get("name", ""))) == "":
+			return "empty"
 		if clean_name(str(k.get("name", ""))).length() > NAME_MAX:
 			return "too_long"
+	if spouse != "" and clean_name(spouse_name) == "":
+		return "empty"
 	if clean_name(spouse_name).length() > NAME_MAX:
 		return "too_long"
 	members.clear()
 	var today := day_number()
 	if spouse != "":
 		var s: Dictionary = SPOUSES[spouse]
-		var sn := clean_name(spouse_name)
-		members.append({"id": spouse, "name": sn if sn != "" else s.name, "sex": s.sex, "relation": s.relation, "role": "spouse", "age": ADULT_AGE, "joined_day": today})
+		members.append({"id": spouse, "name": clean_name(spouse_name), "sex": s.sex, "relation": s.relation, "role": "spouse", "age": ADULT_AGE, "joined_day": today})
 	for i in range(kids.size()):
 		var k: Dictionary = kids[i]
-		var kn := clean_name(str(k.get("name", "")))
-		members.append({"id": CHILDREN[i].id, "name": kn if kn != "" else default_name(i, k.sex), "sex": k.sex, "relation": child_relation(k.sex),
+		members.append({"id": CHILDREN[i].id, "name": clean_name(str(k.get("name", ""))), "sex": k.sex, "relation": child_relation(k.sex),
 			"role": "child", "age": int(k.age), "joined_day": today})
 	chosen = true
 	ensure_tent()
 	_commit()
 	return "chosen"
-
-# 子どもの枠 i の、息子か娘かに合う決まった名前
-static func default_name(i: int, sex: String) -> String:
-	return DEFAULT_NAMES["m" if sex == "m" else "f"][clampi(i, 0, MAX_CHILDREN - 1)]
 
 static func child_relation(sex: String) -> String:
 	return "息子" if sex == "m" else "娘"
@@ -640,13 +629,13 @@ func from_save(d: Dictionary) -> void:
 			continue
 		var info: Dictionary = known[id]
 		var role := "spouse" if SPOUSES.has(id) else "child"
-		# 名前は付け直せるので保存したもの(読めなければ決まった名前)。子どもの息子か娘かも保存したもの
+		# 名前は付け直せるので保存したもの。読めなければ、仮の名前は作らずに続柄(妻・息子など)で呼ぶ(Y で付け直せる)。子どもの息子か娘かも保存したもの
 		var sex: String = info.sex
 		if role == "child" and SaveRead.text(m, "sex") in ["m", "f"]:
 			sex = SaveRead.text(m, "sex")
 		var saved_name := clean_name(SaveRead.text(m, "name"))
 		if saved_name == "" or saved_name.length() > NAME_MAX:
-			saved_name = info.name if role == "spouse" else default_name(CHILDREN.map(func(c): return c.id).find(id), sex)
+			saved_name = child_relation(sex) if role == "child" else str(info.relation)
 		members.append({"id": id, "name": saved_name, "sex": sex, "relation": child_relation(sex) if role == "child" else info.relation, "role": role,
 			"age": mini(SaveRead.count(m, "age"), MAX_START_AGE) if role == "child" else ADULT_AGE, "joined_day": SaveRead.whole(m, "joined_day", day_number())})
 	talked = {}

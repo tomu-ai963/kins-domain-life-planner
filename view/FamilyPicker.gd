@@ -3,10 +3,11 @@ extends ColorRect
 # ── 一緒に暮らす家族を選ぶ画面(2D と 3D で共通。HUD が持つ。2026-11-16) ──────────────
 # ゲームのはじめ(家族の記録がないセーブを開いたときも)に一度だけ出す。都道府県を選んだあと。
 # あとから変えられないので(名前だけは Y で付け直せる)、決める前に確かめる段を入れる。
-#   spouse: 配偶者(Family.SPOUSES か、いない) → spouse_name: 配偶者の名前(いないときは飛ばす)
+#   spouse: 配偶者(Family.SPOUSES の見た目で選ぶか、いない) → spouse_name: 配偶者の名前(いないときは飛ばす)
 #   → children: 子どもの人数(0〜3) → child: 1 人ずつ名前・息子か娘か・年齢 → confirm: 家族を見て「この家族で暮らす」
 # 決めたら chosen({spouse, spouse_name, kids: [{name, sex, age}]})を出す。ルールは logic/Family.gd、決めたあとの処理は Main
 # クリック・タッチ・矢印キー + Enter で選べる(Button のフォーカス)。名前は文字の欄に打つ(Enter で次へ)
+# 名前の欄は空から始まり、入れないと次へ進めない(はじめの名前・仮の名前は出さない。2026-11-26 とむ決定)
 const Family = preload("res://logic/Family.gd")
 const TouchText = preload("res://view/TouchText.gd")
 const BUTTON_SIZE := Vector2(190, 40)
@@ -116,23 +117,26 @@ func show_spouses() -> void:
 	kids = []
 	child_index = -1
 	_title.text = "一緒に暮らす家族を選んでください"
-	_body.text = _shown("家族は土地で暮らし、毎朝少し手伝ってくれます。話しかけると(C)、ときどき贈り物も。\n名前は自分で付けられます。家族の顔ぶれは、一度決めるとあとから変えられません(名前は付け直せます)。")
+	_body.text = _shown("家族は土地で暮らし、毎朝少し手伝ってくれます。話しかけると(C)、ときどき贈り物も。\n名前はこのあと自分で付けます。家族の顔ぶれは、一度決めるとあとから変えられません(名前は付け直せます)。")
 	_show_form(false, false, false)
 	_clear(2)
 	for id in Family.SPOUSE_ORDER:
-		var s: Dictionary = Family.SPOUSES[id]
-		_add_button("%s(%s)" % [s.name, s.relation], show_spouse_name.bind(id))
+		_add_button(spouse_label(id), show_spouse_name.bind(id))
 	_add_button("配偶者はいない", show_children)
+
+# 配偶者の選ぶボタンの文字: 「妻(赤い頭巾)」
+static func spouse_label(id: String) -> String:
+	var s: Dictionary = Family.SPOUSES[id]
+	return "%s(%s)" % [s.relation, s.look]
 
 # 2 段目: 配偶者の名前
 func show_spouse_name(id: String) -> void:
 	step = "spouse_name"
 	spouse = id
-	var s: Dictionary = Family.SPOUSES[id]
-	_title.text = "%sの名前" % s.relation
-	_body.text = "名前を付けてください(%d文字まで)。そのままでもかまいません。" % Family.NAME_MAX
+	_title.text = "%sの名前" % spouse_label(id)
+	_body.text = "名前を付けてください(%d文字まで)。" % Family.NAME_MAX
 	_show_form(true, false, false)
-	_name_edit.text = s.name if spouse_name == "" else spouse_name
+	_name_edit.text = spouse_name
 	_clear(2)
 	_add_button("次へ", _next)
 	_add_button("← 配偶者を選び直す", show_spouses)
@@ -156,7 +160,7 @@ func _start_children(n: int) -> void:
 	kids = []
 	for i in range(n):
 		var c: Dictionary = Family.CHILDREN[i]
-		kids.append({"name": c.name, "sex": c.sex, "age": c.age})
+		kids.append({"name": "", "sex": c.sex, "age": c.age})
 	if n == 0:
 		show_confirm()
 	else:
@@ -184,14 +188,11 @@ func _back_from_child() -> void:
 	else:
 		show_children()
 
-# 息子か娘かを選ぶ。名前が決まった名前のままなら、選んだほうの決まった名前にする
+# 息子か娘かを選ぶ(名前の欄はそのまま)
 func set_sex(sex: String) -> void:
 	if step != "child":
 		return
 	var k: Dictionary = kids[child_index]
-	var current := Family.clean_name(_name_edit.text)
-	if current == "" or current == Family.default_name(child_index, k.sex):
-		_name_edit.text = Family.default_name(child_index, sex)
 	k.sex = sex
 	_refresh_child()
 
@@ -216,8 +217,12 @@ func _keep_child_name() -> void:
 	if step == "child" and child_index >= 0:
 		kids[child_index].name = Family.clean_name(_name_edit.text)
 
-# 名前の欄で Enter / 「次へ」
+# 名前の欄で Enter / 「次へ」。名前が空なら進まない
 func _next() -> void:
+	if step in ["spouse_name", "child"] and Family.clean_name(_name_edit.text) == "":
+		_body.text = "名前を入れてください(%d文字まで)。" % Family.NAME_MAX
+		_focus_name()
+		return
 	match step:
 		"spouse_name":
 			spouse_name = Family.clean_name(_name_edit.text)
@@ -239,17 +244,12 @@ func show_confirm() -> void:
 	_add_button("この家族で暮らす", _decide)
 	_add_button("選び直す", show_spouses)
 
-# 選んだ中身(空の名前は決まった名前に置き換えたもの)
+# 選んだ中身(名前は前後の空白を取ったもの)
 func choice() -> Dictionary:
 	var out_kids := []
-	for i in range(kids.size()):
-		var k: Dictionary = kids[i]
-		var n := Family.clean_name(str(k.name))
-		out_kids.append({"name": n if n != "" else Family.default_name(i, k.sex), "sex": k.sex, "age": int(k.age)})
-	var sn := Family.clean_name(spouse_name)
-	if spouse != "" and sn == "":
-		sn = Family.SPOUSES[spouse].name
-	return {"spouse": spouse, "spouse_name": sn if spouse != "" else "", "kids": out_kids}
+	for k in kids:
+		out_kids.append({"name": Family.clean_name(str(k.name)), "sex": k.sex, "age": int(k.age)})
+	return {"spouse": spouse, "spouse_name": Family.clean_name(spouse_name) if spouse != "" else "", "kids": out_kids}
 
 static func describe(c: Dictionary) -> String:
 	var lines := PackedStringArray()

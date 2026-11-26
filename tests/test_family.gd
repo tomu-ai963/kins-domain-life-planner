@@ -34,6 +34,17 @@ func _initialize() -> void:
 	print("RESULT: %d passed, %d failed" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
+# テスト用の家族の名前(ゲームには、はじめの名前・仮の名前はない。2026-11-26 とむ決定)。子どもは上の子から
+const TEST_SPOUSE_NAMES := {"alyona": "アリョーナ", "vera": "ヴェーラ", "ilya": "イリヤ", "mikhail": "ミハイル"}
+const TEST_KIDS := [{"name": "ワーニャ", "sex": "m", "age": 9}, {"name": "マーシャ", "sex": "f", "age": 6}, {"name": "ポーリャ", "sex": "f", "age": 3}, {"name": "よにんめ", "sex": "m", "age": 1}]
+
+# 配偶者と子ども n 人で家族を決める(名前はテスト用の名前)。結果は Family.choose_custom
+func _choose(f, spouse: String, n: int) -> String:
+	var kids := []
+	for i in range(n):
+		kids.append(TEST_KIDS[mini(i, TEST_KIDS.size() - 1)].duplicate())
+	return f.choose_custom(spouse, TEST_SPOUSE_NAMES.get(spouse, "なまえ") if spouse != "" else "", kids)
+
 func _check(cond: bool, label: String) -> void:
 	if cond:
 		_passed += 1
@@ -72,31 +83,31 @@ func _test_choose() -> void:
 	var f := w.family
 	_check(not f.chosen and f.members.is_empty(), "決める前は誰もいない")
 	_check(f.home_pos() == null and not f.has_tent(), "決める前はテントもない")
-	_check(w.choose_family("bogus", 1) == "unknown", "知らない配偶者は選べない")
-	_check(w.choose_family("alyona", 4) == "unknown", "子どもは %d 人まで" % Family.MAX_CHILDREN)
+	_check(_choose(w.family, "bogus", 1) == "unknown", "知らない配偶者は選べない")
+	_check(_choose(w.family, "alyona", 4) == "unknown", "子どもは %d 人まで" % Family.MAX_CHILDREN)
 	_check(not f.chosen, "選べなかったときは決まらない")
-	_check(w.choose_family("alyona", 2) == "chosen", "配偶者と子ども 2 人で決める")
+	_check(_choose(w.family, "alyona", 2) == "chosen", "配偶者と子ども 2 人で決める")
 	_check(f.members.size() == 3, "家族は 3 人")
 	_check(f.spouse().name == "アリョーナ" and f.spouse().relation == "妻", "配偶者はアリョーナ(妻)")
 	var kids := f.children()
 	_check(kids.size() == 2 and kids[0].name == "ワーニャ" and kids[1].name == "マーシャ", "子どもは上から ワーニャ・マーシャ")
 	_check(f.age_of(kids[0]) == 9 and f.age_of(kids[1]) == 6, "はじめは 9 歳と 6 歳")
-	_check(w.choose_family("ilya", 0) == "already", "あとから変えられない")
+	_check(_choose(w.family, "ilya", 0) == "already", "あとから変えられない")
 	var w2 := _world()
-	_check(w2.choose_family("", 0) == "chosen" and w2.family.members.is_empty(), "配偶者も子どももいない暮らしも選べる")
+	_check(_choose(w2.family, "", 0) == "chosen" and w2.family.members.is_empty(), "配偶者も子どももいない暮らしも選べる")
 	_check(w2.family.home_pos() == null and not w2.family.has_tent(), "ひとりならテントは張らない")
 	var w3 := _world()
-	w3.choose_family("", 3)
+	_choose(w3.family, "", 3)
 	_check(w3.family.spouse().is_empty() and w3.family.children().size() == 3, "配偶者なしで子ども 3 人も選べる")
 	var w4 := _world()
-	w4.choose_family("mikhail", 0)
+	_choose(w4.family, "mikhail", 0)
 	_check(w4.family.spouse().relation == "夫", "ミハイルは夫")
 
 func _test_ages() -> void:
 	print("子どもが育つ")
 	var w := _world()
 	var f := w.family
-	f.choose("vera", 3)
+	_choose(f, "vera", 3)
 	var polya: Dictionary = f.member("polya")
 	_check(f.age_of(polya) == 3, "ポーリャははじめ 3 歳")
 	w.time.shift_days(Family.AGE_DAYS - 1)
@@ -111,7 +122,7 @@ func _test_water_help() -> void:
 	print("配偶者の水やり")
 	var w := _world()
 	var f := w.family
-	f.choose("alyona", 0)
+	_choose(f, "alyona", 0)
 	var spots := [Vector2(-19.5, -19.5), Vector2(-16.5, -19.5), Vector2(-13.5, -19.5), Vector2(-10.5, -19.5)]
 	for p in spots:
 		_crop(w, p)
@@ -138,7 +149,7 @@ func _test_no_water() -> void:
 	print("水を汲めないとき")
 	var w := _world("")  # 県を選ぶ前は川がない
 	var f := w.family
-	f.choose("ilya", 0)
+	_choose(f, "ilya", 0)
 	_check(not _crop(w, Vector2(-19.5, -19.5), "radish").is_empty(), "ラディッシュをまいた")
 	_check(not w.river.exists() and not w.well.is_dug() and not w.pond.is_dug(), "井戸も池も川もない")
 	f.help_today()
@@ -154,7 +165,7 @@ func _test_weed_help() -> void:
 	print("子どもの草取り")
 	var w := _world()
 	var f := w.family
-	f.choose("", 3)  # ワーニャ 9・マーシャ 6・ポーリャ 3
+	_choose(f, "", 3)  # ワーニャ 9・マーシャ 6・ポーリャ 3
 	var spots := [Vector2(-19.5, -19.5), Vector2(-16.5, -19.5), Vector2(-13.5, -19.5), Vector2(-10.5, -19.5), Vector2(-7.5, -19.5)]
 	for p in spots:
 		_crop(w, p)
@@ -175,7 +186,7 @@ func _test_weed_help() -> void:
 func _test_new_day() -> void:
 	print("日付が変わると手伝う")
 	var w := _world()
-	w.family.choose("alyona", 1)
+	_choose(w.family, "alyona", 1)
 	_crop(w, Vector2(-19.5, -19.5))
 	w.time.shift_days(1)
 	var id: String = w.check_new_day()
@@ -204,7 +215,7 @@ func _test_talk_and_gifts() -> void:
 	print("話す・贈り物")
 	var w := _world()
 	var f := w.family
-	f.choose("alyona", 3)
+	_choose(f, "alyona", 3)
 	_check(f.talk("nobody") == "none", "いない人には話せない")
 	_check(_gift_day(w, "alyona") >= 0, "贈り物の日がある")
 	w.refresh_season()
@@ -237,7 +248,7 @@ func _test_tent() -> void:
 	print("テント")
 	var w := _world()
 	var f := w.family
-	f.choose("alyona", 1)
+	_choose(f, "alyona", 1)
 	_check(f.has_tent() and f.tent != null, "小屋がなければテントを張る")
 	_check(f.tent.length() >= Family.CENTER_CLEAR, "テントは家族の杉の場所(中心 %dm)を空ける" % Family.CENTER_CLEAR)
 	var home = f.home_pos()
@@ -262,7 +273,7 @@ func _test_tent() -> void:
 	# 小屋の場所を決めると、そのそばへ
 	var w2 := _world()
 	w2.cabin.site = Vector2(15, 15)
-	w2.family.choose("ilya", 0)
+	_choose(w2.family, "ilya", 0)
 	_check(w2.family.tent.distance_to(Vector2(15, 15)) < 10.0, "小屋の場所が決まっていれば、そのそばに張る")
 	_check(not w2.cabin.footprints()[0].grow(1.0).has_point(w2.family.tent), "小屋にはかからない")
 	# 小屋が完成したら片付けて、小屋へ帰る
@@ -273,7 +284,7 @@ func _test_tent() -> void:
 	# 小屋のベッド(2026-11-18 とむ: 小屋を 6m × 4m に広げて、家族もベッドで寝る)
 	var w5 := _world()
 	w5.cabin.site = Vector2(15, 15)
-	w5.family.choose("vera", 3)
+	_choose(w5.family, "vera", 3)
 	_check(w5.family.bed_spots().is_empty(), "小屋が完成する前はベッドがない(テントで寝る)")
 	w5.cabin.stage = w5.cabin.STAGES.size()
 	var beds: Array = w5.family.bed_spots()
@@ -310,7 +321,7 @@ func _test_tent() -> void:
 	var w6 := _world()
 	w6.cabin.site = Vector2(15, 15)
 	w6.cabin.stage = w6.cabin.STAGES.size()
-	w6.family.choose("", 1)
+	_choose(w6.family, "", 1)
 	_check(w6.family.bed_spots().map(func(x): return x.kind) == ["single"], "子どもが 1 人なら 1 段のベッド(配偶者がいなければ大きいベッドは自分だけ)")
 	# 寝る時刻(時計で決める。子どもが先)
 	_check(not Family.is_bedtime("child", 20.0) and Family.is_bedtime("child", 20.5) and Family.is_bedtime("child", 23.0), "子どもは 20 時半に寝る")
@@ -329,7 +340,7 @@ func _test_together() -> void:
 	print("一緒にする作業")
 	var w := _world()
 	var f := w.family
-	f.choose("alyona", 3)  # ワーニャ 9・マーシャ 6・ポーリャ 3 歳
+	_choose(f, "alyona", 3)  # ワーニャ 9・マーシャ 6・ポーリャ 3 歳
 	# 誘えるか
 	_check(f.invite_problem("alyona", "harvest") == "" and f.invite_problem("masha", "harvest") == "", "収穫は配偶者と 6 歳からの子どもを誘える")
 	_check(f.invite_problem("polya", "harvest") == "young", "3 歳の子は収穫に誘えない")
@@ -395,7 +406,7 @@ func _test_together() -> void:
 	# 夕食: みんなで食べた翌朝は手伝いが増える
 	var w2 := _world()
 	var f2 := w2.family
-	f2.choose("alyona", 2)  # ワーニャ 9・マーシャ 6
+	_choose(f2, "alyona", 2)  # ワーニャ 9・マーシャ 6
 	w2.time.shift_days(Family.AGE_DAYS * 2)  # ワーニャ 11 歳(2 区画)・マーシャ 8 歳(1 区画)
 	var dry := []
 	for i in range(8):
@@ -433,7 +444,7 @@ func _test_together_seasons() -> void:
 	print("田植え・雪かき・石臼を一緒に")
 	var w := _world("niigata")  # 雪の積もる土地。5 月 10 日(春)
 	var f := w.family
-	f.choose("alyona", 3)  # ワーニャ 9・マーシャ 6・ポーリャ 3 歳
+	_choose(f, "alyona", 3)  # ワーニャ 9・マーシャ 6・ポーリャ 3 歳
 	_check(f.invite_problem("alyona", "rice") == "" and f.invite_problem("masha", "rice") == "" and f.invite_problem("polya", "rice") == "young", "田植えは配偶者と 6 歳からの子ども(春)")
 	_check(f.invite_problem("alyona", "snow") == "season", "春は雪かきに誘えない")
 	_check(f.invite_problem("alyona", "mill") == "no_mill", "石臼を置く前は誘えない")
@@ -476,7 +487,7 @@ func _test_save() -> void:
 	print("セーブ")
 	var w := _world()
 	var f := w.family
-	f.choose("vera", 2)
+	_choose(f, "vera", 2)
 	w.time.shift_days(Family.AGE_DAYS * 2)
 	f.help_today()
 	f.talk("masha")
@@ -525,22 +536,26 @@ func _test_picker() -> void:
 	picker.chosen.connect(func(c): got.append(c))
 	picker.open()
 	_check(picker.visible and picker.step == "spouse", "はじめは配偶者を選ぶ")
-	_check(picker.button_texts() == ["アリョーナ(妻)", "ヴェーラ(妻)", "イリヤ(夫)", "ミハイル(夫)", "配偶者はいない"], "配偶者 4 人と「いない」")
-	picker.press("イリヤ(夫)")
+	_check(picker.button_texts() == ["妻(赤い頭巾)", "妻(三つ編み)", "夫(あごひげ)", "夫(帽子)", "配偶者はいない"], "配偶者は見た目で 4 人と「いない」(名前は出さない)(%s)" % str(picker.button_texts()))
+	picker.press("夫(あごひげ)")
 	_check(picker.step == "spouse_name" and picker.spouse == "ilya", "次は配偶者の名前")
-	_check(picker.name_text() == "イリヤ", "名前の欄には、はじめの名前が入っている")
+	_check(picker.name_text() == "", "名前の欄は空から(はじめの名前は入れない)")
+	picker.press("次へ")
+	_check(picker.step == "spouse_name" and picker._body.text.contains("名前を入れてください"), "名前が空なら次へ進めない")
 	picker.type_name("  たろう ")
 	picker.press("次へ")
 	_check(picker.step == "children" and picker.spouse_name == "たろう", "名前を付けて次へ(前後の空白は取る)")
 	_check(picker.button_texts() == ["子どもはいない", "1人", "2人", "3人", "← 配偶者を選び直す"], "子どもは 0〜%d 人" % Family.MAX_CHILDREN)
 	picker.press("2人")
 	_check(picker.step == "child" and picker.child_index == 0, "1 人ずつ決める")
-	_check(picker.name_text() == "ワーニャ" and picker.age_text() == "9歳", "1 人目は ワーニャ 9 歳(息子)から")
+	_check(picker.name_text() == "" and picker.age_text() == "9歳" and picker.kids[0].sex == "m", "1 人目は名前が空で、息子 9 歳から")
 	picker.set_sex("f")
-	_check(picker.name_text() == Family.default_name(0, "f") and picker.kids[0].sex == "f", "娘にすると、決まった名前も娘の名前になる")
+	_check(picker.name_text() == "" and picker.kids[0].sex == "f", "娘にしても、名前は入らない")
+	picker.press("次へ")
+	_check(picker.step == "child" and picker.child_index == 0, "子どもも名前が空なら次へ進めない")
 	picker.type_name("はな")
 	picker.set_sex("m")
-	_check(picker.name_text() == "はな", "自分で付けた名前は、息子/娘を変えても残る")
+	_check(picker.name_text() == "はな", "付けた名前は、息子/娘を変えても残る")
 	picker.set_sex("f")
 	for _i in range(5):
 		picker.change_age(-1)
@@ -553,19 +568,22 @@ func _test_picker() -> void:
 	_check(picker.age_text() == "0歳", "年齢は 0 歳から")
 	picker.change_age(7)
 	picker.press("次へ")
-	_check(picker.step == "child" and picker.child_index == 1 and picker.name_text() == "マーシャ", "2 人目へ(マーシャ 6 歳から)")
+	_check(picker.step == "child" and picker.child_index == 1 and picker.name_text() == "" and picker.age_text() == "6歳", "2 人目へ(名前は空・6 歳から)")
 	picker.press("← 戻る")
 	_check(picker.child_index == 0 and picker.name_text() == "はな" and picker.age_text() == "7歳", "戻ると 1 人目の決めた中身が残っている")
 	picker.press("次へ")
-	picker.type_name("")
+	picker.type_name("そら")
 	picker.press("次へ")
 	_check(picker.step == "confirm", "最後に確かめる")
 	var c: Dictionary = picker.choice()
 	_check(c.spouse == "ilya" and c.spouse_name == "たろう", "配偶者と名前")
-	_check(c.kids == [{"name": "はな", "sex": "f", "age": 7}, {"name": "マーシャ", "sex": "f", "age": 6}], "子どもの名前・娘・年齢(空の名前は決まった名前)(%s)" % str(c.kids))
+	_check(c.kids == [{"name": "はな", "sex": "f", "age": 7}, {"name": "そら", "sex": "f", "age": 6}], "子どもの名前・娘・年齢(%s)" % str(c.kids))
 	_check(FamilyPicker.describe(c).contains("夫: たろう") and FamilyPicker.describe(c).contains("娘: はな 7歳"), "家族の並びを見せる")
 	picker.press("選び直す")
 	_check(picker.step == "spouse" and got.is_empty(), "選び直せる")
+	picker.press("妻(赤い頭巾)")
+	_check(picker.name_text() == "", "選び直すと、名前の欄はまた空から")
+	picker.press("← 配偶者を選び直す")
 	picker.press("配偶者はいない")
 	_check(picker.step == "children", "配偶者がいなければ名前は飛ばす")
 	picker.press("子どもはいない")
@@ -575,12 +593,16 @@ func _test_picker() -> void:
 	picker.queue_free()
 	# 選んだ中身で家族を決める
 	var w := _world()
-	var r: String = w.choose_family_custom({"spouse": "vera", "spouse_name": "ゆき", "kids": [{"name": "そら", "sex": "m", "age": 0}, {"name": "", "sex": "f", "age": 12}]})
+	var r: String = w.choose_family_custom({"spouse": "vera", "spouse_name": "ゆき", "kids": [{"name": "そら", "sex": "m", "age": 0}, {"name": "うみ", "sex": "f", "age": 12}]})
 	_check(r == "chosen", "名前・息子/娘・年齢まで決めて家族を決める")
 	var f := w.family
 	_check(f.spouse().name == "ゆき" and f.spouse().relation == "妻", "配偶者の名前")
 	_check(f.member("vanya").name == "そら" and f.member("vanya").relation == "息子" and f.age_of(f.member("vanya")) == 0, "1 人目: そら(息子 0 歳)")
-	_check(f.member("masha").name == "マーシャ" and f.member("masha").relation == "娘" and f.age_of(f.member("masha")) == 12, "2 人目: 空の名前は決まった名前(娘 12 歳)")
+	_check(f.member("masha").name == "うみ" and f.member("masha").relation == "娘" and f.age_of(f.member("masha")) == 12, "2 人目: うみ(娘 12 歳)")
+	# 名前がなければ決められない(仮の名前は付けない)
+	_check(_world().choose_family_custom({"spouse": "vera", "spouse_name": "", "kids": []}) == "empty", "配偶者の名前が空なら決められない")
+	_check(_world().choose_family_custom({"spouse": "", "kids": [{"name": "  ", "sex": "m", "age": 3}]}) == "empty", "子どもの名前が空なら決められない")
+	_check(not "name" in Family.SPOUSES.alyona and not "name" in Family.CHILDREN[0], "配偶者と子どもの枠に、はじめの名前を持たない")
 
 func _test_custom_rules() -> void:
 	print("名前と年齢の決まり")
@@ -595,7 +617,7 @@ func _test_custom_rules() -> void:
 	# 付け直す
 	var w := _world()
 	var f := w.family
-	f.choose("mikhail", 1)
+	_choose(f, "mikhail", 1)
 	_check(f.rename("mikhail", "けん") == "renamed" and f.spouse().name == "けん", "配偶者の名前を付け直せる")
 	_check(f.rename("vanya", "  りく  ") == "renamed" and f.member("vanya").name == "りく", "子どもの名前を付け直せる")
 	_check(f.rename("vanya", "りく") == "same", "同じ名前なら変わらない")
@@ -615,7 +637,7 @@ func _test_custom_rules() -> void:
 	_check(w3.family.spouse().name == "ちはる", "付け直した名前を読み直せる")
 	var kid: Dictionary = w3.family.member("vanya")
 	_check(kid.name == "めい" and kid.sex == "f" and kid.relation == "娘" and w3.family.age_of(kid) == 5, "1 人目の娘 めい 5 歳を読み直せる")
-	# 名前が壊れていたら決まった名前
+	# 名前が壊れていたら続柄で呼ぶ
 	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TEST_SAVE))
 	data.family.members[0].name = ""
 	data.family.members[1].name = long_name
@@ -625,4 +647,4 @@ func _test_custom_rules() -> void:
 	var w4 := GameWorld.new()
 	w4.save_path = TEST_SAVE
 	w4.load_game()
-	_check(w4.family.spouse().name == "アリョーナ" and w4.family.member("vanya").name == Family.default_name(0, "f"), "読めない名前は決まった名前にする")
+	_check(w4.family.spouse().name == "妻" and w4.family.member("vanya").name == "娘", "読めない名前は、仮の名前を作らずに続柄で呼ぶ(%s・%s)" % [w4.family.spouse().name, w4.family.member("vanya").name])
