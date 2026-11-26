@@ -325,7 +325,7 @@ func _check_new_day() -> void:
 		lines.append("もうすぐ霜が降りる(%s)。霜に弱い野菜は枯れるので、早めに収穫を" % g.frost_date_text())
 	lines.append_array(family_talk.family_help_lines())
 	if has_node("Visitor") and world.visitors.is_here():
-		lines.append("%sが訪ねてきた(C で話す)" % world.visitors.CAST[world.visitors.who()].name)
+		lines.append("%sが訪ねてきた(C で話す)" % world.visitors.name_of(world.visitors.who()))
 	var pond := world.pond
 	if pond.last_gain > 0:
 		lines.append("%sで池に水がたまった(%d%%)" % ["雪" if is_snow_day(f.season) else "雨", pond.water])
@@ -373,7 +373,7 @@ func _bee_action() -> void:
 			$HUD.show_message("丸太をくり抜いた(%d/%d日)。続きは明日" % [near.days_done, b.HOLLOW_DAYS])
 		"finished":
 			_act("build", near.pos)
-			$HUD.show_message("巣箱ができた。春と夏は自然に蜂が入るのを待てる。フョードルさんに分けてもらうこともできる", 8.0)
+			$HUD.show_message("巣箱ができた。春と夏は自然に蜂が入るのを待てる。養蜂家の%sに分けてもらうこともできる" % world.visitors.name_of("fyodor"), 8.0)
 		"done_today":
 			$HUD.show_message("今日はもうくり抜いた(1日1回)")
 		"no_wood":
@@ -637,6 +637,7 @@ func local_text(text: String) -> String:
 		var sp: Dictionary = f.SPECIES[wind]
 		text = text.replace("白樺は樹齢15年から", "%sは樹齢%d年から" % [sp.name, int(sp.wood_age)])
 		text = text.replace("白樺の種", sp.name + "の種").replace("白樺の根元", sp.name + "の根元")
+	text = text.replace("{養蜂家}", world.visitors.name_of("fyodor"))  # 訪問者の名前は地方で決まる(2026-11-26)
 	var family: String = world.quests.family_tree()
 	if family != "cedar":
 		text = text.replace("シベリア杉", f.SPECIES[family].name)
@@ -1347,7 +1348,7 @@ func shop_title() -> String:
 		return "%s(%s)" % [m.get("name", ""), m.get("relation", "")]
 	if _panel == "visitor":
 		var v := world.visitors
-		return "%s(%s)" % [v.CAST[v.who()].name, v.LEVEL_NAMES[v.level_of(v.who())]]
+		return "%s(%s)" % [v.name_of(v.who()), v.LEVEL_NAMES[v.level_of(v.who())]]
 	if _panel == "table":
 		return "腰掛け(クリックか 矢印キー + Enter で選ぶ)"
 	if _panel == "chair":

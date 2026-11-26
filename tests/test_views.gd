@@ -1324,12 +1324,12 @@ func _test_hive_view() -> void:
 	h.last_worked = ""
 	main._unhandled_input(key)
 	_check(has_piece.call("HiveRoof") and has_piece.call("HiveDoor"), "できあがると屋根と入口が付く")
-	_check(hud._message.contains("フョードルさん"), "蜂の入れ方を知らせる")
+	_check(hud._message.contains("望月さん"), "蜂の入れ方を知らせる")
 	_check(not has_piece.call("HiveBee"), "まだ蜂はいない")
 	figure._process(10.0)
 	_check(main.hive_line().contains("蜂を待っている"), "そばで分かる")
 
-	# フョードルさんに分けてもらう
+	# 望月さんに分けてもらう
 	var vs = w.visitors
 	vs.visit = {"day": w.forest.day_number(), "who": "fyodor", "kind": "bees", "done": false, "line": 0}
 	var visitor: Node3D = main.get_node("Visitor")
@@ -2081,9 +2081,9 @@ func _test_closeness_view() -> void:
 	for id in vs.closeness:
 		vs.closeness[id] = 0
 	open.call("chat")
-	_check(main.shop_title() == "ニーナさん(顔見知り)", "見出しに親しさが出る")
+	_check(main.shop_title() == "加藤さん(顔見知り)", "見出しに親しさが出る")
 	_check(main.visitor_talk.visitor_chat_lines("nina").size() == main.visitor_talk.VISITOR_CHATS.nina.size(), "顔見知りの言葉はそのまま")
-	_check(main.neighbors_line().contains("ニーナさん 顔見知り") and main.neighbors_line().contains("パーヴェルさん 顔見知り"), "持ち物に全員の親しさが出る")
+	_check(main.neighbors_line().contains("加藤さん 顔見知り") and main.neighbors_line().contains("伊藤さん 顔見知り"), "持ち物に全員の親しさが出る")
 	hud.close_shop()
 	hud.inventory_open = true
 	_check(hud.status_text().contains("近所の人:"), "Tab で見られる")
@@ -2119,7 +2119,7 @@ func _test_closeness_view() -> void:
 	var keep_pickles: int = w.kitchen.stock.pickles
 	open.call("gift", {"reward": gift})
 	_check(main.visitor_talk.visitor_text().contains("きゅうりの塩漬け 2瓶"), "贈り物の中身を話す")
-	_check(main.visitor_talk.visitor_line().contains("ニーナさん"), "HUD に来ていることが出る")
+	_check(main.visitor_talk.visitor_line().contains("加藤さん"), "HUD に来ていることが出る")
 	_check(main.visitor_talk.visitor_rows().any(func(r): return r.id == "receive" and r.text.contains("塩漬け 2瓶")), "受け取る行が出る")
 	var view = main.get_node("Visitor")
 	view._state = "wait"
@@ -2292,7 +2292,7 @@ func _test_visitor_view() -> void:
 	view.sync_visit()
 	_check(view.state() == "arrive" and view.ground_pos() == view.GATE, "土地の入口から来る")
 	var figure: Node3D = view._figure
-	_check(figure != null and figure.name.contains("nina"), "ニーナさんの姿が出る")
+	_check(figure != null and figure.name.contains("nina"), "加藤さんの姿が出る")
 	view.step(0.1)
 	_check(figure.moving and view.ground_pos() != view.GATE, "歩いて来る")
 	walk.call("wait")
@@ -2316,26 +2316,26 @@ func _test_visitor_view() -> void:
 	# 色は人ごとに違い、プレイヤーの色は変わらない
 	var tunic: MeshInstance3D = figure.get_node("Hips/Upper/Tunic")
 	var player_tunic: MeshInstance3D = player.get_node("Body/Figure/Hips/Upper/Tunic")
-	_check(tunic.material_override.albedo_color == view.LOOKS.nina.look.TUNIC, "ニーナさんの服の色になっている")
+	_check(tunic.material_override.albedo_color == view.LOOKS.nina.look.TUNIC, "加藤さんの服の色になっている")
 	_check(player_tunic.material_override.albedo_color == player.get_node("Body/Figure").TUNIC, "プレイヤーの服の色は変わらない")
 
 	# HUD の案内: 離れていると向きと距離、近いと C
 	player.global_position = Vector3(spot.x + 20, 0, spot.y)
 	var far_line: String = main.visitor_talk.visitor_line()
-	_check(far_line.contains("ニーナさん") and far_line.contains("西") and far_line.contains("20m") and far_line.contains("頼みごと"), "離れていると向きと距離が出る: %s" % far_line)
+	_check(far_line.contains("加藤さん") and far_line.contains("西") and far_line.contains("20m") and far_line.contains("頼みごと"), "離れていると向きと距離が出る: %s" % far_line)
 	press.call(KEY_C)
 	_check(not hud.is_shop_open(), "離れていると話せない")
-	_check(hud._message.contains("ニーナさん"), "どこにいるかを知らせる")
+	_check(hud._message.contains("加藤さん"), "どこにいるかを知らせる")
 	player.global_position = Vector3(spot.x + 2, 0, spot.y)
 	_check(main.visitor_talk.visitor_line().contains("C で話す"), "近いと C の案内が出る")
-	_check(main.kitchen_panel.diary_text().contains("ニーナさんの頼みごとがまだ"), "日記にも出る")
+	_check(main.kitchen_panel.diary_text().contains("加藤さんの頼みごとがまだ"), "日記にも出る")
 	_check(main.compass(Vector2(1, 0)) == "東" and main.compass(Vector2(0, -1)) == "北" and main.compass(Vector2(-1, 1)) == "南西", "向きの文言が合う")
 
 	# 話す: 足りないと渡せない
 	press.call(KEY_C)
 	_check(hud.is_shop_open() and main._panel == "visitor" and not player.is_physics_processing(), "C で話す画面が開き、歩かなくなる")
 	_check(figure.current_action() == "wave", "話しかけると手を振る")
-	_check(main.shop_title().begins_with("ニーナさん"), "見出しが名前になる")
+	_check(main.shop_title().begins_with("加藤さん"), "見出しが名前になる")
 	var text: String = main.shop_header()
 	_check(text.contains("トマト") and text.contains("5kg") and text.contains("260₽"), "何を頼むかが分かる: %s" % text)
 	_check(not hud.status_text().contains("─ 持ち物 ─"), "話す画面には持ち物を重ねない")
@@ -2369,7 +2369,7 @@ func _test_visitor_view() -> void:
 	_check(view._mark.get_child(0).material_override == view._chat_mat, "話すだけの日は白い印")
 	_check(view._figure.get_node("Hips/Upper/Head").get_child_count() > 2, "帽子などが付いている")
 	press.call(KEY_C)
-	_check(main.shop_title().begins_with("パーヴェルさん") and main.shop_header().contains("明日は"), "パーヴェルさんは明日の空模様を話す: %s" % main.shop_header())
+	_check(main.shop_title().begins_with("伊藤さん") and main.shop_header().contains("明日は"), "伊藤さんは明日の空模様を話す: %s" % main.shop_header())
 	_check(main.visitor_talk.visitor_rows().any(func(r): return r.id == "chat_end"), "別れの行が出る")
 	main._on_shop_action("chat_end")
 	_check(not hud.is_shop_open() and not vs.is_here(), "話し終えると用が済む")
@@ -2384,7 +2384,7 @@ func _test_visitor_view() -> void:
 	view.sync_visit()
 	walk.call("wait")
 	var tanya_scale: float = view._figure.scale.x
-	_check(tanya_scale < 1.0, "ターニャさんは体が小さい")
+	_check(tanya_scale < 1.0, "ゆいちゃんは体が小さい")
 	press.call(KEY_C)
 	press.call(KEY_ESCAPE)
 	_check(not vs.is_here(), "Esc で閉じても話し終えたことになる")
@@ -2559,7 +2559,7 @@ func _test_visitor_view() -> void:
 	press.call(KEY_C)
 	main._on_shop_action("receive")
 	_check(w.garden.seeds.radish == 3 and not vs.is_here() and not hud.is_shop_open(), "受け取ると種が増えて、帰っていく")
-	_check(hud._message.contains("ターニャさん") and hud._message.contains("3つ"), "もらった文言: %s" % hud._message)
+	_check(hud._message.contains("ゆいちゃん") and hud._message.contains("3つ"), "もらった文言: %s" % hud._message)
 	view.sync_visit()
 	_check(view.state() == "leave", "受け取ると帰っていく")
 	walk.call("away")

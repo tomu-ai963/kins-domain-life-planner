@@ -2,7 +2,7 @@ extends RefCounted
 
 # ── 丸太の巣箱とはちみつ(描画を持たない) ───────────────────────────
 # 自分の木を伐った丸太(Cabin.own_log_count。市場の丸太は使えない)で巣箱を作り、何日かかけてくり抜く。
-# 蜂は、自然に入るのを待つ(春と夏だけ。日付で決まるので開き直しても同じ)か、フョードルさんに分けてもらう(Visitors)。
+# 蜂は、自然に入るのを待つ(春と夏だけ。日付で決まるので開き直しても同じ)か、養蜂家の訪問者(Visitors の fyodor)に分けてもらう。
 # 蜂が入ると、はちみつが日ごとにたまる。J で採って市場で売る。採っても蜂はいなくならない。
 # 閉じているあいだの分も数える。文言は Main、値段は Market、見た目は view/ が決める。座標の単位は m
 const SaveRead = preload("res://logic/SaveRead.gd")
@@ -23,7 +23,7 @@ const HIVE_GAP := 2.0     # 巣箱どうしの間
 const EDGE_MARGIN := 3.0  # 境界からこの幅は生垣クエストのために空ける
 const SWARM_CHANCE := 0.08  # 空の巣箱に、自然に蜂が入る確率(春と夏の 1 日あたり。2 週間に 1 回ほど)
 const SWARM_SEASONS := ["spring", "summer"]  # 分蜂の季節(現実は春から初夏)
-const SHARE_SEASONS := ["spring", "summer", "autumn"]  # フョードルさんが分けてくれる季節。秋はゲーム都合(次の春まで待たなくていいように)
+const SHARE_SEASONS := ["spring", "summer", "autumn"]  # 養蜂家が分けてくれる季節。秋はゲーム都合(次の春まで待たなくていいように)
 const HONEY_RATE := {"spring": 0.5, "summer": 0.5, "autumn": 0.2, "winter": 0.0}  # 1 日にたまるはちみつ(kg)
 const FLOWER_BONUS := 0.2  # 畑に野菜があると増える分(kg)
 const COMB_MAX := 5.0     # 巣箱にためておける量(kg)

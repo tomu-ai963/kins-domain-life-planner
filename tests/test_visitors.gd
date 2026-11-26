@@ -30,6 +30,7 @@ func _initialize() -> void:
 	_test_gifts()
 	_test_closeness_save()
 	_test_winter_firewood()
+	_test_regional_names()
 	_remove_save()
 	print("RESULT: %d passed, %d failed" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
@@ -45,6 +46,57 @@ func _check(cond: bool, label: String) -> void:
 func _remove_save() -> void:
 	if FileAccess.file_exists(TEST_SAVE):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(TEST_SAVE))
+
+# 訪問者の名前は、選んだ都道府県の地方で決まる(2026-11-26 とむ決定: 地方ごと・大人は名字、子どもは下の名前)
+func _test_regional_names() -> void:
+	print("地方ごとの名前")
+	var w := _world()
+	var vs := w.visitors
+	_check(vs.area() == "chubu" and vs.name_of("nina") == "加藤さん", "県を選ぶ前は日本のまんなかあたり(中部)の名前")
+	for pref in ["hokkaido", "tokyo", "osaka", "fukuoka", "okinawa"]:
+		var w2 := _world()
+		w2.region.choose(pref)
+		var v2 := w2.visitors
+		var expect: Array = {"hokkaido": ["hokkaido", "佐藤さん"], "tokyo": ["kanto", "鈴木さん"], "osaka": ["kinki", "田中さん"], "fukuoka": ["kyushu", "中村さん"], "okinawa": ["okinawa", "比嘉さん"]}[pref]
+		_check(v2.area() == expect[0] and v2.name_of("nina") == expect[1], "%s は %s の名前(%s)" % [pref, expect[0], v2.name_of("nina")])
+	# 47 都道府県が、選ぶ画面の地方(Region.AREAS)どおりの名前になる(沖縄だけ九州と別)
+	var Region = load("res://logic/Region.gd")
+	var all_areas := true
+	var counted := 0
+	for i in range(Region.AREAS.size()):
+		for pref in Region.AREAS[i].prefs:
+			var w3 := GameWorld.new()
+			w3.region.choose(pref)
+			var want: String = "okinawa" if pref == "okinawa" else Visitors.AREA_KEYS[i]
+			counted += 1
+			if w3.visitors.area() != want:
+				all_areas = false
+				print("    ", pref, " → ", w3.visitors.area(), "(", want, " のはず)")
+	_check(all_areas and counted == Region.PREFS.size() and Region.PREFS.size() == 47, "47 都道府県が地方どおりの名前になる(%d)" % counted)
+	var names_ok := true
+	for area in Visitors.NAMES:
+		var n: Dictionary = Visitors.NAMES[area]
+		var got := []
+		for id in Visitors.ORDER:
+			var s: String = str(n.get(id, ""))
+			if s == "" or s in got:
+				names_ok = false
+			got.append(s)
+		if not str(n.tanya).ends_with("ちゃん") or not str(n.nina).ends_with("さん") or not str(n.fyodor).ends_with("さん") or not str(n.pavel).ends_with("さん"):
+			names_ok = false
+	_check(names_ok and Visitors.NAMES.size() == 9, "9 つの地方(沖縄は九州と別)それぞれに 4 人の別々の名前。大人は「さん」、子どもは「ちゃん」")
+	_check(not "name" in Visitors.CAST.nina, "名前を持つのは地方の表だけ(CAST には持たない)")
+	# 名前はセーブに持たないので、親しさは id のまま残り、名前は開いたときの県で決まる
+	var w4 := _world()
+	w4.region.choose("aomori")
+	w4.visitors.closeness.nina = 5
+	w4.save_game()
+	var saved := FileAccess.get_file_as_string(TEST_SAVE)
+	_check(not saved.contains("菅原さん") and not saved.contains("ニーナ"), "名前はセーブに入らない")
+	var w5 := GameWorld.new()
+	w5.save_path = TEST_SAVE
+	w5.load_game()
+	_check(w5.visitors.name_of("nina") == "菅原さん" and int(w5.visitors.closeness.nina) == 5, "読み直すと東北の名前で、親しさはそのまま")
 
 func _world(season := "autumn") -> GameWorld:
 	_remove_save()

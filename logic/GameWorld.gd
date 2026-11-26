@@ -126,6 +126,7 @@ func _init() -> void:
 	wildlife.cabin = cabin
 	wildlife.clock = clock
 	visitors.forest = forest
+	visitors.region = region  # 訪問者の名前は地方で決まる(2026-11-26)
 	visitors.garden = garden
 	visitors.seedlings = seedlings
 	visitors.market = market

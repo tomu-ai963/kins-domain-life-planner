@@ -82,7 +82,7 @@ const VISITOR_FIREWOOD := {
 薪を%s分けてもらえない?お礼に%sをあげる。",
 	"fyodor": "冬の巣箱の番で、薪を使い切ってしまってな。
 薪を%s譲ってくれないか。お礼に%sを持ってきた。",
-	"tanya": "おばあちゃんちのペチカの薪がないの!
+	"tanya": "おばあちゃんちのストーブの薪がないの!
 薪を%sちょうだい!かわりに%sをあげるね。",
 	"pavel": "配達先のお年寄りの家で、薪が切れかけていまして。
 薪を%s分けていただけませんか。お礼に%sをお渡しします。",
@@ -94,7 +94,7 @@ const VISITOR_HELP := {
 	"tanya": ["畑、なんにもないね。\nお母さんが%sを持っていけって!", "雪だと畑はお休みだよね。\nお母さんが%sを持っていけって!"],
 	"pavel": ["差し出がましいですが、お困りのようで。\n%sをどうぞ。村のみんなからです。", "冬の間は大変でしょう。\n%sをどうぞ。村のみんなからです。"],
 }
-# フョードルさんが蜂を分けてくれるときの言葉
+# 養蜂家(fyodor)が蜂を分けてくれるときの言葉
 const VISITOR_BEES := "いい巣箱ができたじゃないか。\nうちの蜂を一群れ分けよう。入れておくよ。"
 const VISITOR_THANKS := {
 	"nina": "{呼}ありがとう、助かったよ。",
@@ -134,14 +134,14 @@ func _take_level_up() -> String:
 		return ""
 	var who: String = v.last_level_up
 	v.last_level_up = ""
-	return VISITOR_LEVEL_UP[v.level_of(who)] % v.CAST[who].name
+	return VISITOR_LEVEL_UP[v.level_of(who)] % v.name_of(who)
 
 # HUD の持ち物に出す、近所の人との親しさ
 func neighbors_line() -> String:
 	var v := world.visitors
 	var parts := PackedStringArray()
 	for who in v.ORDER:
-		parts.append("%s %s" % [v.CAST[who].name, v.LEVEL_NAMES[v.level_of(who)]])
+		parts.append("%s %s" % [v.name_of(who), v.LEVEL_NAMES[v.level_of(who)]])
 	return main._rows(parts, 2)
 
 # 訪問者の言葉
@@ -193,11 +193,11 @@ func _visitor_action(id: String) -> void:
 		return
 	if id == "receive_bees":
 		if v.receive_bees() == "received":
-			hud.show_message(_with_level_up("フョードルさんが巣箱に蜂を入れてくれた。はちみつがたまるのを待とう"), 6.0)
+			hud.show_message(_with_level_up("%sが巣箱に蜂を入れてくれた。はちみつがたまるのを待とう" % v.name_of("fyodor")), 6.0)
 		main._close_shop()
 		return
 	if id == "receive":
-		var person: String = v.CAST[who].name
+		var person: String = v.name_of(who)
 		if v.receive_help() == "received":
 			main._sfx("coin")
 			hud.show_message(_with_level_up("%sから%sをもらった" % [person, reward_text(v.last_reward)]), 6.0)
@@ -227,7 +227,7 @@ func visitor_line() -> String:
 	if not main.has_node("Visitor") or not world.visitors.is_here():
 		return ""
 	var v := world.visitors
-	var person: String = v.CAST[v.who()].name
+	var person: String = v.name_of(v.who())
 	var errand := "話がしたいらしい"
 	if v.has_request():
 		errand = "頼みごとがあるらしい"

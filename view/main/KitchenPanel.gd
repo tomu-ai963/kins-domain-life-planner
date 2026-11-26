@@ -246,7 +246,7 @@ func diary_text() -> String:
 	if world.seedlings.needs_care():
 		todo.append("苗の世話がまだ")
 	if main.has_node("Visitor") and world.visitors.has_request():
-		todo.append("%sの頼みごとがまだ" % world.visitors.CAST[world.visitors.who()].name)
+		todo.append("%sの頼みごとがまだ" % world.visitors.name_of(world.visitors.who()))
 	if world.bees.ready_count() > 0:
 		todo.append("はちみつが採れる巣箱が %d ある" % world.bees.ready_count())
 	if world.cabin.is_complete() and world.kitchen.firewood <= 0:
@@ -310,5 +310,5 @@ func _tomorrow_lines() -> PackedStringArray:
 		lines.append("はちみつが採れる巣箱: %d" % world.bees.ready_tomorrow())
 	lines.append_array(main.shiitake_work.diary_tomorrow())
 	if world.visitors.is_visit_day(world.forest.day_number() + 1):
-		lines.append("%sが来そう" % world.visitors.CAST[world.visitors.who_on(world.forest.day_number() + 1)].name)
+		lines.append("%sが来そう" % world.visitors.name_of(world.visitors.who_on(world.forest.day_number() + 1)))
 	return lines

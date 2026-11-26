@@ -5,7 +5,9 @@ extends RefCounted
 # 渡せるものがあれば頼みごとをして、渡すと市場より少し高いお金か、種や苗をくれる(物々交換)。
 # 渡せるものがなければ話すだけの日になる。頼みごとは断ってもよく、その日が終わると帰る(罰はない)。
 # 収入の手段が尽きているとき(is_stuck)だけは、種を少し分けてくれる(冬はまける種がないのでお金)。
-# フョードルさん(養蜂家)は、空の巣箱があれば蜂を分けてくれる(kind = bees)。
+# 養蜂家(fyodor)は、空の巣箱があれば蜂を分けてくれる(kind = bees)。
+# 名前は選んだ都道府県の地方で決まる(NAMES。2026-11-26 とむ決定: 地方ごと・大人は名字、子どもは下の名前)。
+# 名前はセーブに持たず毎回ここで決めるので、前のセーブも開くと新しい名前になる。親しさは id(nina など)にひもづくので残る
 # 冬は、小屋が建っていて今日のうちに割れる丸太があれば、薪を頼まれる(item = firewood。2026-11-11 とむ決定)。
 # 冬のお礼の種は、春にまける種(冬にまける種はないので)。
 # 今日の中身は最初に決めた時点で保存する(収穫や売買で中身が変わらないように)。
@@ -17,6 +19,7 @@ const Forest = preload("res://logic/Forest.gd")
 const Garden = preload("res://logic/Garden.gd")
 const Seedlings = preload("res://logic/Seedlings.gd")
 const Market = preload("res://logic/Market.gd")
+const Region = preload("res://logic/Region.gd")
 
 signal changed  # 見た目に関わる状態が変わった
 signal dirty    # セーブに入る状態が変わった
@@ -30,13 +33,29 @@ const SEEDLING_SEASONS := ["spring", "summer"]  # 苗をお礼にくれる季節
 const HELP_SEEDS := 3             # 手詰まりのときに分けてくれる種(区画の数)
 const HELP_MONEY := 200           # まける種がない冬に分けてくれるお金。春に種を買える額
 
-# likes: 頼みたいもの(先頭ほど頼みやすい)。なければ、渡せるものの中から頼む
+# role: 役どころ(文言用) / likes: 頼みたいもの(先頭ほど頼みやすい)。なければ、渡せるものの中から頼む
+# id はセーブの親しさの印(前のロシアの名前のころの id のまま。名前ではない)
 const CAST := {
-	"nina": {"name": "ニーナさん", "likes": ["tomato", "cucumber", "carrot", "radish", "potato", "plum"]},
-	"fyodor": {"name": "フョードルさん", "likes": ["garlic", "apple", "pear", "garlic_pickle", "potato", "carrot"]},
-	"tanya": {"name": "ターニャさん", "likes": ["honey", "cherry", "apple", "pirozhki", "jam", "cherry_jam", "pryanik", "carrot", "radish"]},
-	"pavel": {"name": "パーヴェルさん", "likes": ["sauce", "pickles", "jam", "plum_jam", "pear_compote", "sbiten", "tomato", "cucumber"]},
+	"nina": {"role": "畑をやっている近所の人", "likes": ["tomato", "cucumber", "carrot", "radish", "potato", "plum"]},
+	"fyodor": {"role": "養蜂家", "likes": ["garlic", "apple", "pear", "garlic_pickle", "potato", "carrot"]},
+	"tanya": {"role": "近所の子ども", "likes": ["honey", "cherry", "apple", "pirozhki", "jam", "cherry_jam", "pryanik", "carrot", "radish"]},
+	"pavel": {"role": "配達の人", "likes": ["sauce", "pickles", "jam", "plum_jam", "pear_compote", "sbiten", "tomato", "cucumber"]},
 }
+# 地方ごとの名前(大人は名字 + さん、子どもは下の名前 + ちゃん)。地方は Region.AREAS の並び。沖縄は九州と分ける。
+# 名字はその地方に多いものから選んだ(仮。とむの確認待ち)。県を選ぶ前は日本のまんなかあたり(中部)
+const AREA_KEYS := ["hokkaido", "tohoku", "kanto", "chubu", "kinki", "chugoku", "shikoku", "kyushu"]  # Region.AREAS と同じ並び
+const NAMES := {
+	"hokkaido": {"nina": "佐藤さん", "fyodor": "高橋さん", "pavel": "佐々木さん", "tanya": "みのりちゃん"},
+	"tohoku": {"nina": "菅原さん", "fyodor": "阿部さん", "pavel": "斎藤さん", "tanya": "あかりちゃん"},
+	"kanto": {"nina": "鈴木さん", "fyodor": "渡辺さん", "pavel": "小林さん", "tanya": "さくらちゃん"},
+	"chubu": {"nina": "加藤さん", "fyodor": "望月さん", "pavel": "伊藤さん", "tanya": "ゆいちゃん"},
+	"kinki": {"nina": "田中さん", "fyodor": "山本さん", "pavel": "吉田さん", "tanya": "ひなたちゃん"},
+	"chugoku": {"nina": "藤原さん", "fyodor": "原田さん", "pavel": "岡本さん", "tanya": "ことねちゃん"},
+	"shikoku": {"nina": "大西さん", "fyodor": "村上さん", "pavel": "山崎さん", "tanya": "こはるちゃん"},
+	"kyushu": {"nina": "中村さん", "fyodor": "松尾さん", "pavel": "黒木さん", "tanya": "ほのかちゃん"},
+	"okinawa": {"nina": "比嘉さん", "fyodor": "金城さん", "pavel": "宮城さん", "tanya": "なつみちゃん"},
+}
+const LEGACY_AREA := "chubu"
 const ORDER := ["nina", "fyodor", "tanya", "pavel"]  # 来る順番
 
 # 1 回に頼む量(リンゴは個、野菜は kg、保存食は瓶 / 個)
@@ -67,6 +86,7 @@ const POINTS_BEES := 2
 const POINTS_REQUEST := 3
 const GIFT_CHANCE := [0.0, 0.15, 0.25, 0.35]  # 話すだけの日に贈り物を持ってくる割合(段階ごと。仮の数字)
 
+var region = null        # Region(GameWorld が設定する)。名前を地方で決める
 var forest: Forest      # GameWorld が設定する
 var garden: Garden
 var seedlings: Seedlings
@@ -191,7 +211,7 @@ func receive_bees() -> String:
 func has_gift() -> bool:
 	return is_here() and visit.kind == "gift"
 
-# 贈り物の中身。人ごとに決まっている。ニーナさんは今まける種(冬は塩漬け)
+# 贈り物の中身。人ごとに決まっている。畑の人(nina)は今まける種(冬は塩漬け)
 func _gift_reward(person: String, rng: RandomNumberGenerator) -> Dictionary:
 	match person:
 		"nina":
@@ -309,6 +329,21 @@ func _choose_reward(item: String, amount: int, rng: RandomNumberGenerator) -> Di
 
 func is_here() -> bool:
 	return visit.has("who") and not bool(visit.done)
+
+# 選んだ都道府県の地方(NAMES のキー)。沖縄は九州と分ける。県を選ぶ前は LEGACY_AREA
+func area() -> String:
+	if region == null or not region.is_chosen():
+		return LEGACY_AREA
+	if region.pref == "okinawa":
+		return "okinawa"
+	for i in range(Region.AREAS.size()):
+		if region.pref in Region.AREAS[i].prefs:
+			return AREA_KEYS[i]
+	return LEGACY_AREA
+
+# その人の名前(「佐藤さん」「みのりちゃん」)。地方で決まる
+func name_of(id: String) -> String:
+	return str(NAMES[area()].get(id, ""))
 
 func who() -> String:
 	return str(visit.get("who", ""))
