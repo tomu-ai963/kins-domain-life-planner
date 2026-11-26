@@ -13,7 +13,9 @@ extends SceneTree
 #   --region=hokkaido      県を選んでから始める(Region.PREFS の id)。付けなければ県を選ぶ前のルール
 #   --every=1              日ごとの記録を何日おきに残すか(最後の日は必ず残す)。既定 1
 #   --out=sim_out/x.json   書き出し先(プロジェクトからの相対か絶対パス)。既定 sim_out/<plan>_<start>_<days>.json
+#   --param=plots=8,hives=3  遊び方の設定(名前=値 をカンマで区切る。何が使えるかは遊び方のファイルの先頭に書いてある)
 #   --check-save           毎日、保存して開き直しても中身が変わらないかも見る(遅くなる)
+# 遊び方: long_play(test_long_play と同じ)/ farmer(畑だけ)/ bees(巣箱とはちみつ)。plans/_farm.gd は部品なので渡さない
 # 乱数は日付と場所から決まるので、同じ条件なら毎回同じ結果になる。
 
 const GameWorld = preload("res://logic/GameWorld.gd")
@@ -24,8 +26,9 @@ const PLAN_DIR := "res://tools/sim/plans/"
 
 var _opts := {
 	"plan": "long_play", "start": "2026-11-01", "days": "121", "region": "",
-	"every": "1", "out": "", "check-save": false,
+	"every": "1", "out": "", "check-save": false, "param": "",
 }
+var _params := {}
 var _offset := 0
 
 func _initialize() -> void:
@@ -51,7 +54,12 @@ func _parse_args() -> String:
 		return "--days は 1 以上の整数: %s" % _opts.days
 	if not String(_opts.every).is_valid_int() or int(_opts.every) < 1:
 		return "--every は 1 以上の整数: %s" % _opts.every
-	if not FileAccess.file_exists(PLAN_DIR + String(_opts.plan) + ".gd"):
+	for pair in String(_opts.param).split(",", false):
+		var kv2: PackedStringArray = pair.split("=", true, 1)
+		if kv2.size() != 2 or kv2[0] == "":
+			return "--param は 名前=値 をカンマで区切る: %s" % _opts.param
+		_params[kv2[0]] = int(kv2[1]) if kv2[1].is_valid_int() else (float(kv2[1]) if kv2[1].is_valid_float() else kv2[1])
+	if String(_opts.plan).begins_with("_") or not FileAccess.file_exists(PLAN_DIR + String(_opts.plan) + ".gd"):
 		return "遊び方がない: %s%s.gd" % [PLAN_DIR, _opts.plan]
 	return ""
 
@@ -72,6 +80,7 @@ func _open() -> GameWorld:
 func _run() -> int:
 	var plan = load(PLAN_DIR + String(_opts.plan) + ".gd").new()
 	var ctx = SimCtx.new()
+	ctx.params = _params
 	var days := int(_opts.days)
 	var every := int(_opts.every)
 	var warnings := []
@@ -109,7 +118,10 @@ func _run() -> int:
 		if w.pond.last_gain > 0:
 			ctx.count("pond_rain_days")
 		var tracked_before := _net(ctx)
+		ctx.market_used = false
 		plan.play_day(w, ctx, day)
+		if ctx.market_used:
+			ctx.act("market")  # 市場へ行くのは 1 日 1 回と数える
 		# 記録係を通らずに動いたお金(開いたときの出来事など)は other
 		ctx.add_money("other", (w.market.money - money_prev) - (_net(ctx) - tracked_before))
 		money_prev = w.market.money
@@ -130,17 +142,19 @@ func _run() -> int:
 
 	var result := {
 		"meta": {
-			"plan": _opts.plan, "description": plan.DESCRIPTION, "start": _opts.start, "days": days,
+			"plan": _opts.plan, "description": plan.DESCRIPTION, "params": _params, "start": _opts.start, "days": days,
 			"region": _opts.region if String(_opts.region) != "" else null,
 			"every": every, "check_save": _opts["check-save"], "commit": _git(["rev-parse", "--short", "HEAD"]),
 			"logic_changed": _git(["diff", "--stat", "HEAD", "--", "logic"]),  # 数字を書き換えて回したとき、何を変えたか
 		},
 		"summary": {
-			"money_start": money_start, "money_end": w.market.money,
+			"money_start": money_start, "money_end": w.market.money, "net": w.market.money - money_start,
 			"money_min": money_low, "money_min_date": money_low_date, "money_max": money_high,
 			"income": ctx.income, "income_total": _sum(ctx.income),
 			"spend": ctx.spend, "spend_total": _sum(ctx.spend),
-			"events": ctx.events, "season_days": season_days, "end_date": w.forest.today(),
+			"events": ctx.events, "actions_total": ctx.action_total(), "actions": ctx.actions,
+			"net_per_action": snappedf(float(w.market.money - money_start) / maxf(1.0, ctx.action_total()), 0.1),
+			"season_days": season_days, "end_date": w.forest.today(),
 		},
 		"warnings": warnings,
 		"daily": daily,
@@ -203,7 +217,8 @@ func _git(args: Array) -> String:
 func _write(result: Dictionary) -> String:
 	var out := String(_opts.out)
 	if out == "":
-		out = "sim_out/%s_%s_%dd.json" % [_opts.plan, _opts.start, int(_opts.days)]
+		var tag := String(_opts.param).replace("=", "").replace(",", "_")
+		out = "sim_out/%s%s_%s_%dd.json" % [_opts.plan, ("_" + tag) if tag != "" else "", _opts.start, int(_opts.days)]
 	if out.is_relative_path():
 		out = ProjectSettings.globalize_path("res://").path_join(out)
 	DirAccess.make_dir_recursive_absolute(out.get_base_dir())
@@ -217,12 +232,13 @@ func _write(result: Dictionary) -> String:
 
 func _print_summary(r: Dictionary, path: String) -> void:
 	var s: Dictionary = r.summary
-	print("遊び方 %s / %s から %d 日(%s まで)" % [r.meta.plan, r.meta.start, r.meta.days, s.end_date])
+	print("遊び方 %s %s / %s から %d 日(%s まで)" % [r.meta.plan, r.meta.params, r.meta.start, r.meta.days, s.end_date])
 	print("  季節ごとの日数: ", s.season_days)
 	print("  起きたこと: ", s.events)
 	print("  所持金: はじめ %d₽ → 最後 %d₽(いちばん少ない日 %d₽ %s・いちばん多い日 %d₽)" % [s.money_start, s.money_end, s.money_min, s.money_min_date, s.money_max])
 	print("  稼ぎ %d₽: %s" % [s.income_total, s.income])
 	print("  出費 %d₽: %s" % [s.spend_total, s.spend])
+	print("  差し引き %+d₽・操作 %d 回(1 回あたり %+.1f₽): %s" % [s.net, s.actions_total, s.net_per_action, s.actions])
 	for wmsg in r.warnings:
 		print("  注意: ", wmsg)
 	print("WROTE: ", path)
