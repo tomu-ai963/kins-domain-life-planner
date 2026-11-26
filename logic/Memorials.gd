@@ -7,6 +7,7 @@ extends RefCounted
 # - 何日目かは樹齢ではなく暦の日で数える(木は 1 日で 1 年、人は 30 日で 1 年なので混ぜない)
 # - 連続ログインの報酬のような得は付けない。名前を付けても、育ち方・収穫は変わらない
 # 今日と明日を見る日記(ベッド・寝袋)とは分け、記録は Y の画面(歳時記)でめくる。文言は Main
+# 暮らしの節目(2026-11-26): 家族とはじめて夕食を食べた日を、自動で歳時記に残す(events)
 const SaveRead = preload("res://logic/SaveRead.gd")
 const Family = preload("res://logic/Family.gd")
 
@@ -19,6 +20,10 @@ const NOTE_MAX := 40  # 一言のメモの文字数の上限
 var forest = null  # Forest(GameWorld が設定する)
 # [{tree_id: int, species, name, note, named_on: "YYYY-MM-DD", planted_on: "YYYY-MM-DD", gone_on: ""(今もある)}]。名付けた順
 var records := []
+# 暮らしの節目。[{kind: "first_dinner", on: "YYYY-MM-DD", food: 食べたものの名前, people: [一緒に座っていた家族の名前]}]。起きた順
+var events := []
+# 記録を付けはじめる(2026-11-26)前に、もう家族と夕食を食べていたセーブ。最初の夕食の日が分からないので、残さない
+var first_dinner_missed := false
 
 func _commit() -> void:
 	changed.emit()
@@ -65,6 +70,17 @@ func name_tree(tree: Dictionary, new_name: String, new_note := "") -> String:
 	})
 	_commit()
 	return "named"
+
+func has_event(kind: String) -> bool:
+	return events.any(func(e): return e.kind == kind)
+
+# 家族とはじめて夕食を食べた日を残す。2 回目からは何もしない。残したら true
+func note_first_dinner(food: String, people: Array) -> bool:
+	if first_dinner_missed or has_event("first_dinner"):
+		return false
+	events.append({"kind": "first_dinner", "on": forest.today(), "food": food, "people": people.duplicate()})
+	_commit()
+	return true
 
 # Forest.tree_removed から: 記念樹がなくなった日を残す
 func on_tree_removed(tree: Dictionary) -> void:
@@ -114,11 +130,25 @@ static func _is_leap(y: int) -> bool:
 
 # ── セーブ用(ファイルの読み書きは GameWorld) ───────────────────────
 func to_save() -> Dictionary:
-	return {"records": records.duplicate(true)}
+	return {"records": records.duplicate(true), "events": events.duplicate(true), "first_dinner_missed": first_dinner_missed}
 
 # 記念樹の記録がないセーブ(2026-11-23 より前)は、記念樹なしから。読めない記録は 1 件ずつ飛ばす
-func from_save(d: Dictionary) -> void:
+# dined_before: 家族と夕食を食べたことがあるセーブか。節目の記録がないセーブ(2026-11-26 より前)でそうなら、
+# 最初の夕食の日は分からないので残さない(2 回目以降を「はじめて」と書かないように)
+func from_save(d: Dictionary, dined_before := false) -> void:
 	records.clear()
+	events.clear()
+	first_dinner_missed = SaveRead.flag(d, "first_dinner_missed", dined_before and not d.has("events"))
+	for item in SaveRead.list(d.get("events")):
+		var e := SaveRead.dict(item)
+		var on := SaveRead.text(e, "on")
+		if SaveRead.text(e, "kind") != "first_dinner" or not _is_date(on) or has_event("first_dinner"):
+			continue
+		var people := []
+		for n in SaveRead.list(e.get("people")):
+			if n is String and Family.clean_name(n) != "":
+				people.append(Family.clean_name(n))
+		events.append({"kind": "first_dinner", "on": on, "food": SaveRead.text(e, "food"), "people": people})
 	for item in SaveRead.list(d.get("records")):
 		var r := SaveRead.dict(item)
 		var n := Family.clean_name(SaveRead.text(r, "name"))

@@ -138,9 +138,12 @@ func _table_action(id: String) -> void:
 			var meal: Dictionary = k.MEALS[k.RECIPES[food].meal]
 			var note: String = "同じ「%s」の効果はもう効いている" % meal.name if was_active else "「%s」で今日は%s" % [meal.name, meal.short]
 			if main.has_node("Family") and main.get_node("Family").dinner_seated():  # みんなで夕食(2026-11-18)
+				var people: Array = main.get_node("Family").seated_ids().map(func(pid): return world.family.member(pid).get("name", ""))
 				world.family.dine_together()
 				main.get_node("Family").dinner_eat()
 				note += "\nみんなで食べた。明日の朝の手伝いが増える"
+				if world.memorials.note_first_dinner(k.RECIPES[food].name, people.filter(func(n): return n != "")):  # 2026-11-26
+					note += "\nはじめての家族の夕食。歳時記に残した(木のそばの Y で読める)"
 			hud.show_message("%sを食べた。%s" % [k.RECIPES[food].name, note], 5.0)
 		"same":
 			hud.show_message("%sは今日もう食べた(同じものは1日1つまで)" % k.RECIPES[id.trim_prefix("eat_")].name)

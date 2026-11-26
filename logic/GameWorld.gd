@@ -710,7 +710,7 @@ func load_game() -> void:
 	profile.from_save(SaveRead.dict(data.get("profile")))  # 自分の記録がないセーブ(2026-11-16 より前)は、開いたときに一度だけ決める
 	family.from_save(SaveRead.dict(data.get("family")))  # 家族の記録がないセーブ(2026-11-16 より前)は、開いたときに一度だけ選ぶ
 	family.ensure_tent()
-	memorials.from_save(SaveRead.dict(data.get("memorials")))  # 記念樹の記録がないセーブ(2026-11-23 より前)は、記念樹なしから
+	memorials.from_save(SaveRead.dict(data.get("memorials")), family.dined_day >= 0)  # 記念樹の記録がないセーブ(2026-11-23 より前)は、記念樹なしから
 
 # 今のセーブを「名前.infix日付_時刻.json」として写して残す。残した名前を返す
 func _keep_copy(infix: String) -> String:

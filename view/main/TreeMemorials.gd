@@ -41,17 +41,30 @@ func tree_info(tree: Dictionary) -> String:
 	var planted := Forest.date_of_day(f.planted_day(tree))
 	return "%s  %s に植えた(%s)" % [_species_name(str(tree.species)), _date(planted), _planted_days(planted)]
 
-# 歳時記の行(名付けた順)。「2026/11/23  コナラ「長男の木」 春の朝、みんなで植えた」。なくなった木は日付を足す
+# 歳時記の行(日付の順。同じ日は記念樹が先)。「2026/11/23  コナラ「長男の木」 春の朝、みんなで植えた」。なくなった木は日付を足す
+# 暮らしの節目(2026-11-26)も混ぜる: 「2026/11/26  家族ではじめての夕食  ジャム(アリョーナ・ワーニャと)」
 func chronicle_lines() -> PackedStringArray:
-	var lines := PackedStringArray()
+	var rows := []  # [日付, 順番, 行]
 	for r in world.memorials.records:
 		var line := "%s  %s「%s」" % [_date(r.named_on), _species_name(r.species), r.name]
 		if r.note != "":
 			line += "  " + r.note
 		if r.gone_on != "":
 			line += "(%s になくなった)" % _date(r.gone_on)
-		lines.append(line)
-	return lines
+		rows.append([r.named_on, rows.size(), line])
+	for e in world.memorials.events:
+		rows.append([e.on, rows.size(), event_line(e)])
+	rows.sort_custom(func(a, b): return a[0] < b[0] or (a[0] == b[0] and a[1] < b[1]))
+	return PackedStringArray(rows.map(func(r): return r[2]))
+
+# 節目の 1 行
+static func event_line(e: Dictionary) -> String:
+	var line := "%s  家族ではじめての夕食" % _date(e.on)
+	if str(e.food) != "":
+		line += "  " + str(e.food)
+	if not e.people.is_empty():
+		line += "(%sと)" % "・".join(PackedStringArray(e.people))
+	return line
 
 func _on_tree_named(tree_name: String, note: String) -> void:
 	main.get_node("Player").set_physics_process(true)

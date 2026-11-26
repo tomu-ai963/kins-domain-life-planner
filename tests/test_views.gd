@@ -3261,7 +3261,7 @@ func _test_tree_memorial_view() -> void:
 	_check(hud.tree_memorial.visible and hud.is_picker_open() and not player.is_physics_processing(), "木のそばの Y で記念樹の画面が開き、そのあいだは歩かない")
 	_check(not hud.family_names.visible, "家族の名前の画面は開かない")
 	_check(hud.tree_memorial.info_text().begins_with("白樺") and hud.tree_memorial.info_text().contains("今日植えた"), "画面に木の 1 行(%s)" % hud.tree_memorial.info_text())
-	_check(hud.tree_memorial.chronicle_text().contains("まだ記念樹はありません"), "歳時記はまだ空")
+	_check(hud.tree_memorial.chronicle_text().contains("まだ記録はありません"), "歳時記はまだ空")
 	hud.tree_memorial.type_text("長男の木", "春の朝、みんなで植えた")
 	hud.tree_memorial.press("決める")
 	_check(not hud.tree_memorial.visible and player.is_physics_processing(), "決めると閉じて、歩ける")
@@ -3279,6 +3279,15 @@ func _test_tree_memorial_view() -> void:
 	player.global_position = Vector3(spot.x + 1.0, 0, spot.y)
 	_press(KEY_Y)
 	_check(hud.tree_memorial.chronicle_text().contains("白樺「長男の木」  春の朝、みんなで植えた"), "歳時記に記録が出る")
+	# 暮らしの節目(2026-11-26)も日付の順に混ざる。同じ日は記念樹が先
+	var named_on: String = w.memorials.records[-1].named_on
+	w.memorials.events.append({"kind": "first_dinner", "on": "2000-01-02", "food": "ジャム", "people": ["アリョーナ", "ワーニャ"]})
+	var lines: PackedStringArray = main.tree_memorials.chronicle_lines()
+	_check(lines[0] == "2000/01/02  家族ではじめての夕食  ジャム(アリョーナ・ワーニャと)" and lines[-1].contains("「長男の木」"), "前の日の夕食が先に出る(%s)" % lines[0])
+	w.memorials.events[0].on = named_on
+	lines = main.tree_memorials.chronicle_lines()
+	_check(lines[-2].contains("「長男の木」") and lines[-1].contains("家族ではじめての夕食"), "同じ日は記念樹が先")
+	w.memorials.events.clear()
 	hud.tree_memorial.type_text("べつの名前")
 	hud.tree_memorial.press("やめる")
 	_check(w.memorials.record_for(tree).name == "長男の木" and player.is_physics_processing(), "やめると何も変わらない")
@@ -3880,6 +3889,12 @@ func _test_family_together() -> void:
 	k.stock.jam = 1
 	main.kitchen_panel._table_action("eat_jam")
 	_check(f.dined_today() and hud._message.contains("みんなで食べた"), "腰掛けで食べると、みんなで食べた: " + hud._message.replace("\n", " ").left(60))
+	# はじめての家族の夕食は、歳時記に残る(2026-11-26)
+	var first_dinner: Array = w.memorials.events.filter(func(e): return e.kind == "first_dinner")
+	_check(first_dinner.size() == 1 and first_dinner[0].food == k.RECIPES.jam.name and first_dinner[0].people.size() == 4, "はじめての家族の夕食を、食べたものと座っていた 4 人で残す")
+	_check(hud._message.contains("はじめての家族の夕食。歳時記に残した"), "歳時記に残したと知らせる")
+	var last_line: String = main.tree_memorials.chronicle_lines()[-1]
+	_check(last_line.contains("家族ではじめての夕食  %s(" % k.RECIPES.jam.name), "歳時記の行に出る: " + last_line)
 	_check(view.seated_ids().all(func(id): return view.figure_of(id).current_action() == "eat"), "座っている家族も食べる動きをする")
 	var stood: bool = steps.call(func(): return view.seated_ids().is_empty())
 	_check(stood and not view.figure_of("alyona").sitting, "食べ終わると席を立つ")

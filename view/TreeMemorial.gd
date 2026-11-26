@@ -1,7 +1,7 @@
 extends ColorRect
 
 # ── 記念樹の名前とメモを付ける画面と、歳時記(2D と 3D で共通。HUD が持つ。2026-11-23) ──────────────
-# 木のそばで Y(タッチはメニューの「名前」)で開く。名前と一言のメモの欄、その下に歳時記(記念樹の記録を名付けた順に)を出す。
+# 木のそばで Y(タッチはメニューの「名前」)で開く。名前と一言のメモの欄、その下に歳時記(記念樹の記録と暮らしの節目を日付の順に)を出す。
 # 「決める」で decided(名前, メモ)を出す。ルールは logic/Memorials.gd、文言は Main(view/main/TreeMemorials.gd)
 const Memorials = preload("res://logic/Memorials.gd")
 const BUTTON_SIZE := Vector2(160, 40)
@@ -87,7 +87,7 @@ func open(info: String, current_name: String, current_note: String, chronicle: P
 		b.custom_minimum_size = TOUCH_BUTTON_SIZE if touch_mode else BUTTON_SIZE
 	var lines := PackedStringArray(["─ 歳時記 ─"])
 	if chronicle.is_empty():
-		lines.append("まだ記念樹はありません")
+		lines.append("まだ記録はありません")
 	else:
 		if chronicle.size() > CHRONICLE_ROWS:
 			lines.append("(前の %d 件は省略)" % (chronicle.size() - CHRONICLE_ROWS))

@@ -19,6 +19,7 @@ func _initialize() -> void:
 	_test_gone()
 	_test_save()
 	_test_days()
+	_test_first_dinner()
 	_remove_save()
 	print("RESULT: %d passed, %d failed" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
@@ -156,6 +157,37 @@ func _test_save() -> void:
 		"文字",
 	]})
 	_check(m3.records.size() == 1 and m3.records[0].name == "よい" and m3.records[0].note == "" and m3.records[0].planted_on == "2026-01-02", "読めない記録は飛ばし、足りないところは埋める")
+
+func _test_first_dinner() -> void:
+	print("はじめての家族の夕食(2026-11-26)")
+	var w := _world()
+	var m := w.memorials
+	_check(m.note_first_dinner("ジャム", ["アリョーナ", "ワーニャ"]), "はじめての夕食を残す")
+	_check(m.events.size() == 1 and m.events[0].on == "2026-05-10" and m.events[0].food == "ジャム" and m.events[0].people == ["アリョーナ", "ワーニャ"], "日付・食べたもの・一緒に座っていた家族")
+	w.time.set_today("2026-05-11")
+	_check(not m.note_first_dinner("スープ", []) and m.events.size() == 1, "2 回目からは残さない")
+	w.save_game()
+	var w2 := GameWorld.new()
+	w2.save_path = TEST_SAVE
+	w2.load_game()
+	_check(w2.memorials.events.size() == 1 and w2.memorials.events[0].people == ["アリョーナ", "ワーニャ"], "セーブに残る")
+	_check(not w2.memorials.note_first_dinner("スープ", []), "読み込んだあとも 2 回目は残さない")
+	# 節目の記録がない前のセーブ: 夕食を食べたことがあれば、最初の日が分からないので残さない
+	var m3 := Memorials.new()
+	m3.forest = w.forest
+	m3.from_save({"records": []}, true)
+	_check(m3.first_dinner_missed and not m3.note_first_dinner("ジャム", []) and m3.events.is_empty(), "前のセーブで夕食を食べていたら、残さない")
+	m3.from_save({}, false)
+	_check(not m3.first_dinner_missed and m3.note_first_dinner("ジャム", []), "前のセーブでまだ食べていなければ、次の夕食を残す")
+	m3.from_save({"events": [], "first_dinner_missed": false}, true)
+	_check(not m3.first_dinner_missed, "節目の記録があるセーブは、保存した値を使う")
+	m3.from_save({"events": [
+		{"kind": "first_dinner", "on": "2026-01-02", "food": "ジャム", "people": ["よい", 5, ""]},
+		{"kind": "first_dinner", "on": "2026-01-03", "food": "二度目"},
+		{"kind": "ほか", "on": "2026-01-02"},
+		"文字",
+	]})
+	_check(m3.events.size() == 1 and m3.events[0].people == ["よい"], "読めない節目は飛ばし、はじめての夕食は 1 つだけ")
 
 func _test_days() -> void:
 	print("暦の日で数える")
