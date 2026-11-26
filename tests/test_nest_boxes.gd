@@ -26,6 +26,7 @@ func _initialize() -> void:
 	_test_starlings()
 	_test_felled()
 	_test_save()
+	_test_night_traces()
 	_remove_save()
 	print("RESULT: %d passed, %d failed" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
@@ -118,6 +119,47 @@ func _test_starlings() -> void:
 	_check(w.wildlife.home_for("starling", rng, Vector2(-30, -30)) == BIG, "住みかは巣箱の木")
 	nb.boxes.append({"pos": SMALL, "days_done": 1, "last_worked": ""})
 	_check(nb.starlings() == 2, "作りかけの巣箱には来ない")
+
+func _test_night_traces() -> void:
+	print("夜の巣箱の跡(2026-11-26)")
+	var w := _world()
+	var nb := w.nest_boxes
+	_check(nb.inspect(BIG, "night") == "none", "巣箱がなければ調べられない")
+	nb.act(BIG)
+	_next_day(w)
+	_check(nb.inspect(BIG, "night") == "none", "作りかけの巣箱は調べられない")
+	nb.act(BIG)
+	_next_day(w)
+	nb.act(BIG)
+	w.forest.season = "spring"
+	_check(nb.inspect(BIG, "night") == "new", "掛けたその日は、まだ跡がない")
+	_next_day(w)
+	w.forest.season = "winter"
+	_check(nb.inspect(BIG, "night") == "off_season", "冬は来ないので跡もない")
+	w.forest.season = "spring"
+	_check(nb.inspect(BIG, "night", false) == "absent", "ムクドリのいない土地では見つからない")
+	_check(nb.inspect(BIG, "day") == "day", "昼は調べるまでもない(つがいが見える)")
+	_check(nb.inspect(BIG, "preview") == "preview", "プレビュー中は調べない")
+	_check(nb.inspect(BIG, "dawn") == "dawn", "夜明け前は、まだ今日は来ていない")
+	_check(nb.traces_today().is_empty(), "調べる前は、日記に出すものがない")
+	_check(nb.inspect(BIG + Vector2(1, 0), "night") == "found", "夜に調べると跡が見つかる")
+	var trace: String = nb.boxes[0].trace
+	_check(trace in nb.TRACES.spring and nb.traces_today() == [trace], "春の跡(%s)が日記用に残る" % trace)
+	_check(nb.inspect(BIG, "night") == "found_today" and nb.inspect(BIG, "dawn") == "found_today", "1 日 1 回")
+	_check(not ("starling" in w.wildlife.seen), "図鑑には入らない")
+	_check(nb.trace_of(nb.boxes[0]) == trace, "見つかる物は日付と巣箱で決まる")
+	w.save_game()
+	var w2 := GameWorld.new()
+	w2.save_path = TEST_SAVE
+	w2.load_game()
+	var b2: Dictionary = w2.nest_boxes.box_on(BIG)
+	_check(not b2.is_empty() and b2.traced_on == w.forest.today() and b2.trace == trace, "セーブに残る(開き直しても、今夜はもう調べた)")
+	_next_day(w)
+	_check(nb.traces_today().is_empty(), "次の日は、日記に出さない")
+	w.forest.season = "summer"
+	_check(nb.inspect(BIG, "night") == "found" and nb.boxes[0].trace in nb.TRACES.summer, "次の日の夜も見つかる。夏は夏の跡(%s)" % nb.boxes[0].trace)
+	w.nest_boxes.from_save({"boxes": [{"x": 1.0, "y": 2.0, "days_done": 3, "last_worked": "2026-01-01"}]})
+	_check(nb.boxes[0].traced_on == "" and nb.boxes[0].trace == "", "跡の記録がない前のセーブは、まだ調べていない")
 
 func _test_felled() -> void:
 	print("木を伐る")

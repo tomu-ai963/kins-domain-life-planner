@@ -100,6 +100,58 @@ func act(pos: Vector2) -> String:
 	_commit()
 	return "finished" if is_done(b) else "worked"
 
+# ── 夜の巣箱の跡(2026-11-26。Hermes のレビューの案 2) ─────────────────
+# ムクドリは昼にしか出ないので、夜しか遊べない人は会いにくい。昼に来る条件がそろっていた日は、
+# 夜に巣箱を調べると跡(羽・巣材など)が見つかり、日記に 1 行残る。直接見たときの図鑑の登録(Wildlife.seen)とは分ける。
+# 1 つの巣箱を調べられるのは 1 日 1 回。見つかる物は日付と巣箱で決まる(開き直しても同じ)
+const TRACES := {
+	"spring": ["羽が 1 枚", "巣材の枯れ草", "巣材の小枝"],
+	"summer": ["卵の殻のかけら", "羽が 1 枚", "ひなの産毛"],
+}
+
+# L(掛け終えた巣箱のそば)で調べる。time は Main が渡す時間帯: day / dawn(夜明け前) / night(昼が過ぎて暗い) / preview
+# lives_here: この土地にムクドリがいるか(Wildlife.lives_here)
+# 結果: found / found_today(今夜はもう調べた) / day / dawn / preview / off_season / new(今日掛けたばかり) / absent / none
+func inspect(pos: Vector2, time: String, lives_here := true) -> String:
+	var tree := tree_near(pos)
+	var b: Dictionary = box_on(tree.pos) if not tree.is_empty() else {}
+	if b.is_empty() or not is_done(b):
+		return "none"
+	last_box = b
+	if not (forest.season in SEASONS):
+		return "off_season"
+	if not lives_here:
+		return "absent"
+	if time == "preview":
+		return "preview"
+	if time == "day":
+		return "day"
+	if b.get("traced_on", "") == forest.today():
+		return "found_today"
+	if time == "dawn":
+		return "dawn"
+	if b.last_worked == forest.today():
+		return "new"
+	b.traced_on = forest.today()
+	b.trace = trace_of(b)
+	_commit()
+	return "found"
+
+# その日にその巣箱で見つかる物(季節の中から、日付と巣箱で決まる)
+func trace_of(b: Dictionary) -> String:
+	var list: Array = TRACES.get(forest.season, TRACES.spring)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = ("starling_trace:%s:%.2f:%.2f" % [forest.today(), b.pos.x, b.pos.y]).hash()
+	return list[rng.randi_range(0, list.size() - 1)]
+
+# 今日見つけた跡(日記用)。[見つけた物, ...]
+func traces_today() -> Array:
+	var out := []
+	for b in boxes:
+		if b.get("traced_on", "") == forest.today() and str(b.get("trace", "")) != "":
+			out.append(str(b.trace))
+	return out
+
 # 今、巣箱にムクドリが来ている数(つがい = 2 羽 × 掛け終えた巣箱)。時間帯は Wildlife が見る
 func starlings() -> int:
 	if not (forest.season in SEASONS):
@@ -110,7 +162,8 @@ func starlings() -> int:
 func to_save() -> Dictionary:
 	var list := []
 	for b in boxes:
-		list.append({"x": b.pos.x, "y": b.pos.y, "days_done": b.days_done, "last_worked": b.last_worked})
+		list.append({"x": b.pos.x, "y": b.pos.y, "days_done": b.days_done, "last_worked": b.last_worked,
+			"traced_on": b.get("traced_on", ""), "trace": b.get("trace", "")})
 	return {"boxes": list}
 
 func from_save(d: Dictionary) -> void:
@@ -123,5 +176,7 @@ func from_save(d: Dictionary) -> void:
 				"pos": pos,
 				"days_done": clampi(SaveRead.whole(b, "days_done"), 0, WORK_DAYS),
 				"last_worked": SaveRead.text(b, "last_worked"),
+				"traced_on": SaveRead.text(b, "traced_on"),  # 夜の跡の記録がないセーブ(2026-11-26 より前)は、まだ調べていない
+				"trace": SaveRead.text(b, "trace"),
 			})
 	changed.emit()

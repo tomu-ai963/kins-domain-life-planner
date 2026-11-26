@@ -255,6 +255,9 @@ func diary_text() -> String:
 		todo.append("餌台の餌が切れている")
 	if f.season == "winter" and f.prunable_count() > 0:
 		todo.append("剪定できる果樹が %d本 ある" % f.prunable_count())
+	var traces: Array = world.nest_boxes.traces_today()  # 夜の巣箱の跡(2026-11-26)
+	if not traces.is_empty():
+		todo.append("巣箱でムクドリの跡を見つけた(%s)" % "・".join(PackedStringArray(traces)))
 	lines.append("今日")
 	lines.append_array(main._bullets(todo, "やり残したことはない"))
 	lines.append("")

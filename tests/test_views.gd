@@ -1419,7 +1419,31 @@ func _test_nest_box_view() -> void:
 	_check(hung.position.y >= nb.MIN_RADIUS and hung.position.y <= 2.5 and hung.get_child_count() == 4, "掛け終えると幹の高さ %.2fm に掛かる(屋根・穴・止まり木)" % hung.position.y)
 	_check(hung.position.z > NEST_TREE.y, "幹のカメラの側(南)に掛かる")
 	w.forest.set_season("spring")
-	_check(main.nest_box_line().contains("つがい"), "春はつがいが出入りしている")
+	var clock = w.clock
+	var at_hour := func(h: int) -> void:
+		var today: String = w.forest.today()
+		clock.fixed_now = {"month": int(today.substr(5, 2)), "day": int(today.substr(8, 2)), "hour": h, "minute": 0, "second": 0}
+	at_hour.call(13)
+	_check(main.nest_box_line().contains("つがいが出入りしている"), "春の昼はつがいが出入りしている")
+	# 夜の巣箱の跡(2026-11-26): 夜に L で調べると、昼のあいだに来ていた跡が見つかる
+	at_hour.call(22)
+	_check(main.nest_box_line().contains("掛けたばかり"), "掛けた日の夜は、まだ跡がない: " + main.nest_box_line())
+	b.last_worked = "2000-01-01"
+	_check(main.nest_box_line() == "ムクドリの巣箱: 夜は巣の中(L で跡を調べる)", "夜は調べられると出る: " + main.nest_box_line())
+	var seen_before: Array = w.wildlife.seen.duplicate()
+	_press(KEY_L)
+	_check(b.traced_on == w.forest.today() and hud._message.contains("巣箱の下を調べた。%sが落ちていた" % b.trace), "L で跡が見つかる: " + hud._message)
+	_check(w.wildlife.seen == seen_before, "図鑑には入らない")
+	_check(main.nest_box_line() == "ムクドリの巣箱: 今夜は%sを見つけた" % b.trace, "見つけた物が出る")
+	_check(main.kitchen_panel.diary_text().contains("巣箱でムクドリの跡を見つけた(%s)" % b.trace), "日記の「今日」に 1 行残る")
+	_press(KEY_L)
+	_check(hud._message.contains("今夜もう調べた"), "1 日 1 回")
+	b.traced_on = ""
+	at_hour.call(4)
+	_check(main.nest_box_line().contains("明るくなると"), "夜明け前は、まだ来ていない: " + main.nest_box_line())
+	_press(KEY_L)
+	_check(b.traced_on == "" and hud._message.contains("夜明け前"), "夜明け前に調べても見つからない")
+	clock.fixed_now = {}
 	var wildlife_view = main.get_node("Wildlife")
 	wildlife_view._spawn("starling")
 	var birds: Array = wildlife_view._animals.filter(func(a): return a.id == "starling")

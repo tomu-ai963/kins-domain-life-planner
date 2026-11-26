@@ -459,13 +459,35 @@ func _nest_box_action(pos: Vector2) -> void:
 			var soon := "もうすぐムクドリのつがいが来る" if world.forest.season in nb.SEASONS else "春になると、ムクドリのつがいが来る"
 			$HUD.show_message("ムクドリの巣箱を木に掛けた。%s" % soon, 7.0)
 		"done":
-			$HUD.show_message("この木にはもう巣箱が掛かっている(ムクドリが来るのは春と夏)")
+			_inspect_nest_box(pos)
 		"done_today":
 			$HUD.show_message("今日はもう作った(1日1回)")
 		"too_many":
 			$HUD.show_message("ムクドリの巣箱は%dつまで" % nb.MAX_BOXES)
 		"no_wood":
 			$HUD.show_message("丸太が%d本いる(市場で買うか、育った木を Z で伐る)" % nb.LOG_COST)
+
+# L(掛け終えた巣箱のそば): 夜なら、昼のあいだに来ていたムクドリの跡を調べる(2026-11-26。Hermes のレビューの案 2)
+# 見つけても図鑑には入れない(図鑑は直接見たときだけ)。日記の「今日」に 1 行残る
+func _inspect_nest_box(pos: Vector2) -> void:
+	var nb := world.nest_boxes
+	var result: String = nb.inspect(pos, starling_time(), world.wildlife.lives_here("starling"))
+	var b: Dictionary = nb.last_box
+	match result:
+		"found":
+			$HUD.show_message("巣箱の下を調べた。%sが落ちていた。昼のあいだに、ムクドリのつがいが出入りしていたらしい(日記に残した)" % b.trace, 7.0)
+		"found_today":
+			$HUD.show_message("この巣箱は今夜もう調べた(%s)" % b.trace)
+		"dawn":
+			$HUD.show_message("まだ夜明け前。ムクドリは明るくなると巣箱に出入りする")
+		"new":
+			$HUD.show_message("掛けたばかりの巣箱には、まだ跡がない(ムクドリは明日の昼に来る)")
+		"preview":
+			$HUD.show_message("プレビュー中は巣箱を調べられない")
+		"day":
+			$HUD.show_message("ムクドリのつがいが巣箱に出入りしている")
+		_:
+			$HUD.show_message("この木にはもう巣箱が掛かっている(ムクドリが来るのは春と夏)")
 
 # HUD に出す、育った木のそばのムクドリの巣箱の 1 行。そばにいなければ ""
 func nest_box_line() -> String:
@@ -484,8 +506,29 @@ func nest_box_line() -> String:
 	if not nb.is_done(b):
 		return "ムクドリの巣箱: %d/%d日(%s)" % [b.days_done, nb.WORK_DAYS, "今日は済んだ" if nb.worked_today(b) else "L で続きを作る"]
 	if world.forest.season in nb.SEASONS:
+		match starling_time():  # 夜の巣箱の跡(2026-11-26)
+			"night":
+				if b.get("traced_on", "") == world.forest.today():
+					return "ムクドリの巣箱: 今夜は%sを見つけた" % b.trace
+				if b.last_worked == world.forest.today():
+					return "ムクドリの巣箱: 掛けたばかり(明日の昼に来る)"
+				return "ムクドリの巣箱: 夜は巣の中(L で跡を調べる)"
+			"dawn":
+				return "ムクドリの巣箱: 明るくなると、つがいが出入りする"
+			"preview":
+				if not world.wildlife.is_daytime():
+					return "ムクドリの巣箱: 夜は巣の中"
 		return "ムクドリの巣箱: つがいが出入りしている"
 	return "ムクドリの巣箱: 春にムクドリが来る"
+
+# ムクドリの巣箱を調べるときの時間帯: day / dawn(夜明け前) / night(昼が過ぎて暗い) / preview(N・T・G のプレビュー中)
+func starling_time() -> String:
+	var wl := world.wildlife
+	if wl.clock.is_preview() or world.forest.time_offset_years > 0.0:
+		return "preview"
+	if wl.is_daytime():
+		return "day"
+	return "night" if wl.is_afternoon() else "dawn"
 
 # HUD に出す、餌台のそばの 1 行。そばにいなければ ""
 func feeder_line() -> String:
